@@ -1,0 +1,8 @@
+# Version control defaults
+.env
+*.log
+
+# Brainstorming visual companion artifacts
+.superpowers/
+
+docs/Prompt.md
