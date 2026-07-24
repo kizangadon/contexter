@@ -1,0 +1,2 @@
+- Default config must preserve backward compatibility (wal_sync=true)
+- checkpoint() must always flush WAL regardless of wal_sync setting

@@ -1,0 +1,9 @@
+- AC-1: `memory_index` CF exists with LZ4 compression, 16MB write buffer
+- AC-2: Creating a memory writes index entries for session_id, tags, memory_type
+- AC-3: Updating a memory updates index entries
+- AC-4: Deleting a memory removes index entries
+- AC-5: search_memories uses indexes for filtered queries (falls back to full scan for keyword-only)
+- AC-6: `count_*` methods use estimate-num-keys where possible
+- AC-7: Pre-lowered content stored on write for efficient keyword matching
+- AC-8: `cargo test` passes
+- AC-9: `cargo clippy --all-targets -- -D warnings` is clean

@@ -1,0 +1,2 @@
+- max_workers=1: sequential execution (graceful fallback)
+- max_workers=0: should default to 4 gracefully

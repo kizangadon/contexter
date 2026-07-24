@@ -1,0 +1,4 @@
+- AC-1: `cargo test --all-features` compiles without errors
+- AC-2: `cargo test --all-features` passes all tests
+- AC-3: `cargo clippy --all-targets --all-features -- -D warnings` is clean
+- AC-4: Default feature `cargo test` still passes (181/181)

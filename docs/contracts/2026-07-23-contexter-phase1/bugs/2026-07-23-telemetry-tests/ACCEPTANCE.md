@@ -1,0 +1,6 @@
+- AC-1: `python/core_bridge.py` exists with async `Engine` class
+- AC-2: Async wrapper uses `ThreadPoolExecutor(max_workers=4)`
+- AC-3: All CRUD operations have `async` wrappers (session, memory, agent, skill, settings, audit, maintenance)
+- AC-4: `test_read_only_path_error` exists and passes
+- AC-5: `cargo test` passes
+- AC-6: `cargo clippy -- -D warnings` is clean

@@ -1,0 +1,12 @@
+- AC-1: LZ4 decompress refuses output > 64MB with Compression error
+- AC-2: Zstd decompress refuses output > 128MB with Compression error
+- AC-3: `Engine::create_memory` rejects content > 1MB with Validation error
+- AC-4: `Engine::set_setting` rejects empty key with Validation error
+- AC-5: `Engine::set_setting` rejects key > 256 chars with Validation error
+- AC-6: `EngineError::sanitized()` returns generic messages without IDs
+- AC-7: CLI warns when path is in /tmp
+- AC-8: CLI rejects non-directory paths
+- AC-9: `Skill.file_path` field has doc comment about path traversal
+- AC-10: `Validation` variant exists on `EngineError` if accessed
+- AC-11: `cargo test` passes
+- AC-12: `cargo clippy -- -D warnings` is clean

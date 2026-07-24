@@ -1,0 +1,6 @@
+- AC-1: JSON deserialization has depth limiting (not full `disable_recursion_limit()`)
+- AC-2: `update_memory()` enforces 1MB content size limit
+- AC-3: CLI warns on /tmp paths (current behavior is acceptable)
+- AC-4: `Skill.file_path` validated on creation/update
+- AC-5: `cargo test` passes
+- AC-6: `cargo clippy --all-targets -- -D warnings` is clean

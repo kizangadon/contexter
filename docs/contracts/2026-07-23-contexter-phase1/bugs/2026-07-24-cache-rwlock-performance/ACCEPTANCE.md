@@ -1,0 +1,9 @@
+- AC-1: CacheEntry uses inserted_at for TTL eviction (no longer #[allow(dead_code)])
+- AC-2: CacheConfig has max_ttl: Option<Duration> (default: None)
+- AC-3: When max_ttl is set, expired entries are evicted on access
+- AC-4: Search/list iterators release read lock between batch reads
+- AC-5: storage_size() batches property queries to reduce lock count
+- AC-6: StorageBackend trait has write_batch() method
+- AC-7: RocksDbBackend implements write_batch() 
+- AC-8: cargo test passes
+- AC-9: cargo clippy --all-targets -- -D warnings is clean

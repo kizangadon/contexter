@@ -1,0 +1,6 @@
+- AC-1: `CacheEntry.inserted_at` is no longer `#[allow(dead_code)]`
+- AC-2: `CacheConfig` has `max_ttl: Option<Duration>` field
+- AC-3: When `max_ttl` is set, expired entries are evicted on next access
+- AC-4: Default behavior (no TTL) matches current LRU-only eviction
+- AC-5: `cargo test` passes
+- AC-6: `cargo clippy --all-targets -- -D warnings` is clean

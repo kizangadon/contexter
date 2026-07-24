@@ -1,0 +1,10 @@
+- AC-1: `contexter status` displays data path, per-CF sizes, entity counts, cache ratio, engine stats
+- AC-2: `contexter checkpoint` flushes WAL and returns sequence number
+- AC-3: Every `#[pymethod]` is wrapped in `catch_unwind` — Rust panics become `PyRuntimeError`
+- AC-4: All JSON deserialization in python.rs uses `set_max_depth(64)`
+- AC-5: Python method `status()` exists (renamed from `health()`)
+- AC-6: `delete_session` returns `None` (Python void), not bool
+- AC-7: `delete_memory` returns `None`, not bool
+- AC-8: `list_sessions` takes only `filter_json: &str`, defaults offset=0 limit=50 internally
+- AC-9: `cargo test` passes
+- AC-10: `cargo clippy -- -D warnings` is clean

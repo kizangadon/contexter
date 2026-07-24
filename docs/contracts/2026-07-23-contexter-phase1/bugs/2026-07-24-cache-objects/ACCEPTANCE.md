@@ -1,0 +1,5 @@
+- AC-1: Cache stores typed domain objects instead of raw Vec<u8>
+- AC-2: Cache hit on engine.get_session/get_memory returns cached object without JSON deserialization
+- AC-3: All existing CRUD operations work correctly with typed cache
+- AC-4: `cargo test` passes
+- AC-5: `cargo clippy --all-targets -- -D warnings` is clean
