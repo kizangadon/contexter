@@ -1,0 +1,2 @@
+- `maybe_flush_wal()` is sufficient for crash safety — `set_sync(true)` is redundant when WAL sync follows
+- Other write methods in the file use the same pattern (put_cf without sync, then flush_wal)

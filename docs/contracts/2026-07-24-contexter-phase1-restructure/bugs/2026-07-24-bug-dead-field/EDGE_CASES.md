@@ -1,0 +1,1 @@
+- serde(skip) means the field is not serialized — search queries from Python with `project` field are still deserialized correctly (unknown fields are ignored by default with serde_json)

@@ -1,0 +1,3 @@
+- If a CF handle lookup fails, the new `EngineError` should surface the CF name in the error message
+- `store_raw` and `write_batch` with `wal_sync: false` should skip the WAL flush (no regression)
+- Existing callers that create sessions, memories, agents, skills should continue to work identically (they already call maybe_flush_wal)

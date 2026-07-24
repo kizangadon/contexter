@@ -1,0 +1,5 @@
+- [ ] REQ-CLI-001: `cli.rs` replaced with `cli/mod.rs` directory module
+- [ ] All imports compile: `use crate::cli::*` and `use crate::cli::{...}` work as before
+- [ ] `cargo build --workspace` succeeds
+- [ ] `cargo test --workspace` succeeds (352+ tests)
+- [ ] Binary entry point at `src/bin/cli/mod.rs` remains intact

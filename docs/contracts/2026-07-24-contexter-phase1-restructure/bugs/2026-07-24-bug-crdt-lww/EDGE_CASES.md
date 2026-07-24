@@ -1,0 +1,3 @@
+- `lww_merge` already exists in `crdt/merge.rs` with signature `lww_merge<T>(left: T, right: T, left_time: Instant, right_time: Instant) -> T`
+- LwwRegister's merge uses logical_clock first, then wall_clock as tiebreaker
+- Must handle that the merge function in merge.rs uses `std::time::Instant` — convert or adapt as needed

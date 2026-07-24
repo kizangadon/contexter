@@ -1,0 +1,2 @@
+- Doc comments use `///` (triple slash), not `//!` (inner doc) — confirm correct style
+- Removing a duplicate doc comment block should not cause any compilation issues

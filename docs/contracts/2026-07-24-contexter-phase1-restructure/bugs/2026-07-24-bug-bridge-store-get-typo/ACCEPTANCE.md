@@ -1,0 +1,5 @@
+- [ ] REQ-SGT-001: bridge.rs `store` passes `value` directly (not `value.as_bytes()`)
+- [ ] REQ-SGT-002: bridge.rs `get` returns `opt.map(Ok)` or simply `opt` — no String::from_utf8
+- [ ] `cargo build --workspace` succeeds
+- [ ] `cargo check --features python` succeeds (0 errors)
+- [ ] `cargo test --workspace` succeeds (no regressions)

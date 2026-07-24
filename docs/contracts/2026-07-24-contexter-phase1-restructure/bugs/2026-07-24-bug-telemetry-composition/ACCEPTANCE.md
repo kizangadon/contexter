@@ -1,0 +1,5 @@
+- [ ] REQ-TEL-001: `TelemetryCollector` struct exists in telemetry module; `Engine.telemetry` field exists; `Engine.stats` field removed or aliased
+- [ ] All existing `self.stats.*` call sites compile through the telemetry layer
+- [ ] `EngineStats` snapshot/reporting still works identically
+- [ ] Compiles: `cargo build --workspace` succeeds
+- [ ] Tests pass: `cargo test --workspace` succeeds

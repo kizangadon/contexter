@@ -1,0 +1,5 @@
+- [ ] REQ-TFI-001: `tests/common/fixtures.rs` exists with reusable test helpers
+- [ ] REQ-TFI-002: `tests/storage/column_families_test.rs` exists with CF tests
+- [ ] REQ-TFI-003: `tests/engine/search_test.rs` exists with search tests
+- [ ] All new tests pass: `cargo test --workspace`
+- [ ] No regressions in existing tests (no tests removed or changed)

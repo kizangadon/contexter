@@ -1,0 +1,3 @@
+- `EngineStats` is moved inside `TelemetryCollector` — external consumers that access `engine.stats` directly must be updated to `engine.telemetry.stats`
+- The `Engine.stats()` method (returning `HashMap<String, u64>`) should continue to work unchanged
+- Since this is still a stub, the `TelemetryCollector` doesn't need to do anything beyond wrapping `EngineStats`

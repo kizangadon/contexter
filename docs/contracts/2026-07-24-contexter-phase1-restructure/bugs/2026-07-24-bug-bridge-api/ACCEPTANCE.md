@@ -1,0 +1,4 @@
+- [ ] REQ-BRG-001: `PyEngine::store()` takes `&str` value, `Engine::store()` takes `&str` value
+- [ ] REQ-BRG-002: `PyEngine::get()` returns `Option<String>`, `Engine::get()` returns `Option<String>`
+- [ ] All bridge tests pass: `cargo test --workspace` succeeds
+- [ ] Python bridge compiles (if `python` feature enabled): `cargo build --features python`

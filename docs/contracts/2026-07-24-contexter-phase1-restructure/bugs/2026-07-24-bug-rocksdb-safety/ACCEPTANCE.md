@@ -1,0 +1,5 @@
+- [ ] REQ-RSK-001: `cf()` signature changed to `fn cf(&self, name: &str) -> EngineResult<&ColumnFamily>`, all callers use `?` instead of unwrap/panic
+- [ ] REQ-RSK-002: `store_raw()` calls `self.maybe_flush_wal()?` before returning; `write_batch()` calls `self.maybe_flush_wal()?` before returning
+- [ ] REQ-RSK-003: `ColumnFamilyMap` struct has `#[allow(dead_code)]` with a documented reason comment
+- [ ] Compiles: `cargo build --workspace` succeeds
+- [ ] Tests pass: `cargo test --workspace` succeeds with no regressions (stays at 269)

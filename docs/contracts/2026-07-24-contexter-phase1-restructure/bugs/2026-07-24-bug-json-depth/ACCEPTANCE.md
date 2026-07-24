@@ -1,0 +1,5 @@
+- [ ] REQ-JSN-001: `check_json_depth()` removed; `from_str()` calls `serde_json::from_str()` directly (single pass)
+- [ ] JSON parsing safety: deeply nested JSON beyond 128 levels is still rejected by serde_json's default recursion limit
+- [ ] No performance regression for valid JSON inputs
+- [ ] Tests pass: `cargo test --workspace` succeeds
+- [ ] Bridge test `test_py_invalid_json_returns_error` still catches malformed JSON

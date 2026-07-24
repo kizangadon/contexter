@@ -1,0 +1,4 @@
+- [ ] REQ-ETX-001: `engine/mod.rs` inline test block removed; 6 new test files in `tests/engine/` cover all test cases
+- [ ] Each extracted test file uses `#[path = "../common/mod.rs"] mod common;` for shared helpers
+- [ ] All test assertions preserved — no test coverage lost
+- [ ] Tests pass: `cargo test --workspace` succeeds with the same test count and outcomes

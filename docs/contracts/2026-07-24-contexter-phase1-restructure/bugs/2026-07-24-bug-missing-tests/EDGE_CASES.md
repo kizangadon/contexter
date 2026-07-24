@@ -1,0 +1,3 @@
+- Test files must use `#[path = "../common/mod.rs"] mod common;` (not `mod common;`) per the established pattern
+- Column family tests should not require opening a database (can test constants directly)
+- Search tests should use the Engine API (not RocksDbBackend directly)
