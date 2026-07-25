@@ -15,3 +15,16 @@ target/
 
 # Cargo local config
 .cargo/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Coverage
+.coverage
+*.coverage
+
+# Build artifacts
+*.egg-info/
+dist/
+build/

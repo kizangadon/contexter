@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "contexter-core"
+version = "0.1.0"
+description = "Rust core engine for the Contexter agent memory system"
+requires-python = ">=3.12"
+
+[tool.maturin]
+features = ["python"]
+bindings = "pyo3"
