@@ -23,7 +23,7 @@ impl Engine {
                 "Setting key must be 1-256 characters".into(),
             ));
         }
-        self.storage.write().unwrap().set_setting(key, value)?;
+        self.storage.write().unwrap_or_else(|e| e.into_inner()).set_setting(key, value)?;
         let cache_key = setting_cache_key(key);
         self.cache
             .store(&cache_key, CachedValue::Raw(value.as_bytes().to_vec()));
@@ -43,7 +43,7 @@ impl Engine {
             return Ok(Some(value));
         }
 
-        match self.storage.read().unwrap().get_setting(key)? {
+        match self.storage.read().unwrap_or_else(|e| e.into_inner()).get_setting(key)? {
             Some(value) => {
                 self.cache
                     .store(&cache_key, CachedValue::Raw(value.as_bytes().to_vec()));
@@ -59,7 +59,7 @@ impl Engine {
 
     /// Append a new entry to the audit log.
     pub fn log_audit(&self, entry: NewAuditEntry) -> EngineResult<()> {
-        self.storage.write().unwrap().append_audit_entry(&entry)
+        self.storage.write().unwrap_or_else(|e| e.into_inner()).append_audit_entry(&entry)
     }
 
     /// Query the audit log with optional filters.
@@ -69,13 +69,13 @@ impl Engine {
         let keys = self
             .storage
             .read()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .scan_cf_keys(CF_AUDIT, KEY_PREFIX_AUDIT)?;
 
         let mut results = Vec::new();
 
         for chunk in keys.chunks(BATCH_SIZE) {
-            let storage = self.storage.read().unwrap();
+            let storage = self.storage.read().unwrap_or_else(|e| e.into_inner());
             for key_bytes in chunk {
                 let key_str = std::str::from_utf8(key_bytes).map_err(|e| {
                     EngineError::Internal(format!("invalid UTF-8 key: {e}"))

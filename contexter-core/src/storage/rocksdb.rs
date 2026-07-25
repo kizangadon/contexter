@@ -5,6 +5,7 @@
 //! multiple logical entity kinds to share a single column family.
 
 use std::collections::HashMap;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use chrono::Utc;
@@ -176,6 +177,14 @@ impl RocksDbBackend {
                 ColumnFamilyDescriptor::new(*name, cf_opts)
             })
             .collect();
+
+        // Ensure the data directory exists with restrictive permissions (0o700)
+        // so that other users cannot read the RocksDB data files.
+        let data_path = Path::new(&config.path);
+        std::fs::create_dir_all(data_path)
+            .map_err(|e| EngineError::Internal(format!("failed to create db dir: {e}")))?;
+        std::fs::set_permissions(data_path, std::fs::Permissions::from_mode(0o700))
+            .map_err(|e| EngineError::Internal(format!("failed to set db dir perms: {e}")))?;
 
         let db =
             DB::open_cf_descriptors(&opts, &config.path, descriptors).map_err(EngineError::from)?;
@@ -781,6 +790,30 @@ impl StorageBackend for RocksDbBackend {
             }
             None => Ok(None),
         }
+    }
+
+    fn get_memories(&self, ids: &[Uuid]) -> EngineResult<Vec<Option<Memory>>> {
+        let cf = self.cf(self.cfs.memory_items)?;
+        let keys: Vec<String> = ids.iter().map(Self::memory_key).collect();
+        let cf_and_keys: Vec<(&ColumnFamily, &[u8])> = keys
+            .iter()
+            .map(|k| (cf, k.as_bytes()))
+            .collect();
+
+        let results = self.db.multi_get_cf(cf_and_keys);
+
+        let mut memories = Vec::with_capacity(ids.len());
+        for result in results {
+            match result {
+                Ok(Some(bytes)) => {
+                    let memory = serde_json::from_slice(&bytes)?;
+                    memories.push(Some(memory));
+                }
+                Ok(None) => memories.push(None),
+                Err(e) => return Err(EngineError::Storage(e.to_string())),
+            }
+        }
+        Ok(memories)
     }
 
     fn search_memories(&self, query: &MemorySearchQuery) -> EngineResult<Vec<Memory>> {

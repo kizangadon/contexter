@@ -4,6 +4,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::fts::TextContent;
+
 /// The semantic category of a stored memory.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +48,17 @@ pub struct Memory {
     pub created_at: DateTime<Utc>,
     /// Timestamp when the memory was last updated.
     pub updated_at: DateTime<Utc>,
+}
+
+impl TextContent for Memory {
+    fn text_content(&self) -> String {
+        let tags_part = if self.tags.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", self.tags.join(" "))
+        };
+        format!("{}{}", self.content, tags_part)
+    }
 }
 
 /// Input data for creating a new memory.
@@ -132,6 +145,7 @@ fn default_version() -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fts::TextContent;
     use chrono::Utc;
 
     /// Verify that Memory defaults are applied correctly.
@@ -203,5 +217,68 @@ mod tests {
             query.project.is_none(),
             "project should be ignored during deserialization"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // TextContent
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn text_content_concatenates_content_and_tags() {
+        let now = Utc::now();
+        let m = Memory {
+            id: Uuid::now_v7(),
+            session_id: Uuid::now_v7(),
+            agent_id: Uuid::now_v7(),
+            memory_type: MemoryType::Fact,
+            content: "important fact".into(),
+            embedding: None,
+            tags: vec!["rust".into(), "async".into()],
+            version: 1,
+            created_at: now,
+            updated_at: now,
+        };
+        let tc = m.text_content();
+        assert!(tc.contains("important fact"));
+        assert!(tc.contains("rust"));
+        assert!(tc.contains("async"));
+    }
+
+    #[test]
+    fn text_content_handles_empty_tags() {
+        let now = Utc::now();
+        let m = Memory {
+            id: Uuid::now_v7(),
+            session_id: Uuid::now_v7(),
+            agent_id: Uuid::now_v7(),
+            memory_type: MemoryType::Fact,
+            content: "just content".into(),
+            embedding: None,
+            tags: vec![],
+            version: 1,
+            created_at: now,
+            updated_at: now,
+        };
+        let tc = m.text_content();
+        assert_eq!(tc, "just content");
+    }
+
+    #[test]
+    fn text_content_handles_single_tag() {
+        let now = Utc::now();
+        let m = Memory {
+            id: Uuid::now_v7(),
+            session_id: Uuid::now_v7(),
+            agent_id: Uuid::now_v7(),
+            memory_type: MemoryType::Fact,
+            content: "some data".into(),
+            embedding: None,
+            tags: vec!["unique".into()],
+            version: 1,
+            created_at: now,
+            updated_at: now,
+        };
+        let tc = m.text_content();
+        assert_eq!(tc, "some data unique");
     }
 }

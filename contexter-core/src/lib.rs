@@ -44,7 +44,7 @@ pub mod vector;
 
 // Re-export key types for convenience.
 pub use cache::{CacheConfig, CacheTelemetry, DashMapCache};
-pub use engine::{Engine, EngineStats, StorageConfig};
+pub use engine::{Engine, EngineConfig, EngineStats, StorageConfig};
 pub use error::*;
 pub use models::{
     Agent, AgentFilter, AgentPatch, AgentStatus, AuditEntry, AuditFilter, Correlation, Feedback,

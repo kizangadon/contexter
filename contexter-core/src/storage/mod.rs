@@ -172,6 +172,23 @@ pub trait StorageBackend: Send + Sync {
     fn get(&self, cf_name: &str, key: &str) -> EngineResult<Option<Vec<u8>>>;
 
     // -----------------------------------------------------------------------
+    // Batch operations
+    // -----------------------------------------------------------------------
+
+    /// Retrieve multiple memories by their unique identifiers.
+    ///
+    /// Default implementation calls `get_memory` in a loop for backward
+    /// compatibility. Efficient implementations should override with a
+    /// single batch operation (e.g., RocksDB `multi_get`).
+    fn get_memories(&self, ids: &[Uuid]) -> EngineResult<Vec<Option<Memory>>> {
+        let mut results = Vec::with_capacity(ids.len());
+        for id in ids {
+            results.push(self.get_memory(*id)?);
+        }
+        Ok(results)
+    }
+
+    // -----------------------------------------------------------------------
     // Phase 2 stubs — vector indexing
     // -----------------------------------------------------------------------
 

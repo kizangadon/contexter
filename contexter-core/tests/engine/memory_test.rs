@@ -346,12 +346,19 @@ fn test_memory_get_cached() {
         })
         .expect("create");
 
-    // First get after write-through create should be a L1 hit.
+    // First get after invalidate-on-create should be a L1 miss (populates cache).
     let tel_before = engine.cache_telemetry();
     let fetched = engine.get_memory(memory.id).expect("get memory");
     let tel_after = engine.cache_telemetry();
     assert!(fetched.is_some());
-    assert_eq!(tel_after.hits - tel_before.hits, 1);
+    assert_eq!(tel_after.misses - tel_before.misses, 1,
+        "first get should miss (invalidate-on-create policy)");
+    // Second get should be a hit (cache-aside populated the cache).
+    let tel_before2 = engine.cache_telemetry();
+    let _fetched2 = engine.get_memory(memory.id).expect("get memory");
+    let tel_after2 = engine.cache_telemetry();
+    assert_eq!(tel_after2.hits - tel_before2.hits, 1,
+        "second get should be a hit");
 }
 
 #[test]

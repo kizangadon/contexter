@@ -130,7 +130,11 @@ fn test_cache_clear_and_clear_type() {
         })
         .expect("create memory");
 
-    // Both are cached via write-through.
+    // Sessions are cached via write-through; memories use invalidate-on-create.
+    // Pre-load the memory into cache via get (cache-aside) so we can test
+    // type-scoped cache clearing.
+    engine.get_memory(memory.id).expect("get memory - prime cache");
+
     engine.clear_cache_type("session");
     // Session should miss now, memory should still hit.
     let tel_before = engine.cache_telemetry();

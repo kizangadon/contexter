@@ -12,18 +12,18 @@ use std::sync::atomic::Ordering;
 impl Engine {
     /// Flush any pending writes to durable storage.
     pub fn flush(&self) -> EngineResult<()> {
-        self.storage.write().unwrap().flush()
+        self.storage.write().unwrap_or_else(|e| e.into_inner()).flush()
     }
 
     /// Trigger a checkpoint / compaction and return the current RocksDB
     /// sequence number.
     pub fn checkpoint(&self) -> EngineResult<u64> {
-        self.storage.write().unwrap().checkpoint()
+        self.storage.write().unwrap_or_else(|e| e.into_inner()).checkpoint()
     }
 
     /// Report storage size information per column family.
     pub fn storage_size(&self) -> EngineResult<StorageSize> {
-        self.storage.read().unwrap().storage_size()
+        self.storage.read().unwrap_or_else(|e| e.into_inner()).storage_size()
     }
 
     /// Snapshot of L1 cache performance counters.
@@ -49,7 +49,7 @@ impl Engine {
     /// Store a string value under the given `key` in the named column family.
     pub fn store(&self, cf_name: &str, key: &str, value: &str) -> EngineResult<()> {
         self.telemetry.stats.store_ops.fetch_add(1, Ordering::Relaxed);
-        self.storage.write().unwrap().store_raw(cf_name, key, value.as_bytes())
+        self.storage.write().unwrap_or_else(|e| e.into_inner()).store_raw(cf_name, key, value.as_bytes())
     }
 
     /// Retrieve a string value for the given `key` from the named column family.
@@ -57,7 +57,7 @@ impl Engine {
         self.telemetry.stats.get_ops.fetch_add(1, Ordering::Relaxed);
         self.storage
             .read()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get_raw(cf_name, key)?
             .map(|v| {
                 String::from_utf8(v)

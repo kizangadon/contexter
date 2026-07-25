@@ -28,9 +28,12 @@ fn test_engine_with_config_applies_cache_settings() {
         per_type_capacity: HashMap::new(),
         max_ttl: None,
     };
-    let engine = Engine::with_config(StorageConfig {
-        path: dir.path().to_path_buf(),
-        cache_config: Some(config),
+    let engine = Engine::with_config(EngineConfig {
+        storage: StorageConfig {
+            path: dir.path().to_path_buf(),
+            cache_config: Some(config),
+        },
+        ..EngineConfig::default()
     })
     .expect("open with config");
     let tel = engine.cache_telemetry();

@@ -15,7 +15,7 @@ impl Engine {
     ///
     /// **Policy:** Write-through.
     pub fn create_agent(&self, new_agent: NewAgent) -> EngineResult<Agent> {
-        let agent = self.storage.write().unwrap().create_agent(new_agent)?;
+        let agent = self.storage.write().unwrap_or_else(|e| e.into_inner()).create_agent(new_agent)?;
         let key = agent_cache_key(&agent.id);
         self.cache.store(&key, CachedValue::Agent(agent.clone()));
         Ok(agent)
@@ -33,7 +33,7 @@ impl Engine {
         }
 
         // L1 miss — fetch from L2, populate L1.
-        match self.storage.read().unwrap().get_agent(id)? {
+        match self.storage.read().unwrap_or_else(|e| e.into_inner()).get_agent(id)? {
             Some(agent) => {
                 self.cache.store(&key, CachedValue::Agent(agent.clone()));
                 Ok(Some(agent))
@@ -49,13 +49,13 @@ impl Engine {
         let keys = self
             .storage
             .read()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .scan_cf_keys(CF_AGENTS, KEY_PREFIX_AGENT)?;
 
         let mut results = Vec::new();
 
         for chunk in keys.chunks(BATCH_SIZE) {
-            let storage = self.storage.read().unwrap();
+            let storage = self.storage.read().unwrap_or_else(|e| e.into_inner());
             for key_bytes in chunk {
                 let key_str = std::str::from_utf8(key_bytes).map_err(|e| {
                     EngineError::Internal(format!("invalid UTF-8 key: {e}"))
@@ -104,7 +104,7 @@ impl Engine {
     ///
     /// **Policy:** Write-around.
     pub fn update_agent(&self, id: Uuid, patch: &AgentPatch) -> EngineResult<Agent> {
-        let agent = self.storage.write().unwrap().update_agent(id, patch)?;
+        let agent = self.storage.write().unwrap_or_else(|e| e.into_inner()).update_agent(id, patch)?;
         let key = agent_cache_key(&id);
         self.cache.invalidate(&key);
         Ok(agent)
@@ -114,7 +114,7 @@ impl Engine {
     ///
     /// **Policy:** Invalidate.
     pub fn delete_agent(&self, id: Uuid) -> EngineResult<()> {
-        self.storage.write().unwrap().delete_agent(id)?;
+        self.storage.write().unwrap_or_else(|e| e.into_inner()).delete_agent(id)?;
         let key = agent_cache_key(&id);
         self.cache.invalidate(&key);
         Ok(())
