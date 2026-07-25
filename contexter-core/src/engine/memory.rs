@@ -14,16 +14,57 @@ impl Engine {
     ///
     /// **Policy:** Write-through.
     pub fn create_memory(&self, new_memory: NewMemory) -> crate::error::EngineResult<Memory> {
-        self.telemetry.stats.memories_created.fetch_add(1, Ordering::Relaxed);
+        self.telemetry
+            .stats
+            .memories_created
+            .fetch_add(1, Ordering::Relaxed);
         // Refuse content larger than 1MB to prevent resource exhaustion.
         if new_memory.content.len() > 1024 * 1024 {
             return Err(EngineError::Validation(
                 "Memory content exceeds 1MB limit".into(),
             ));
         }
-        let memory = self.storage.write().unwrap().create_memory(new_memory)?;
+        let memory = self
+            .storage
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .create_memory(new_memory)?;
         let key = memory_cache_key(&memory.id);
-        self.cache.store(&key, CachedValue::Memory(memory.clone()));
+        self.cache.invalidate(&key);
+
+        // Index into L3 vector index if enabled.
+        if let Some(ref vx) = self.vector_index {
+            if let Some(ref emb) = memory.embedding {
+                vx.insert(&memory.id.to_string(), emb)
+                    .map_err(|e| EngineError::Internal(format!("Vector index insert: {e}")))?;
+            }
+        }
+
+        // Index into L4 full-text search if enabled.
+        if let Some(ref fts) = self.fts_index {
+            let tags_value = if memory.tags.is_empty() {
+                String::new()
+            } else {
+                memory.tags.join(" ")
+            };
+            fts.index(
+                &memory.id.to_string(),
+                &[
+                    crate::fts::FieldValue {
+                        field_name: "content",
+                        value: memory.content.clone(),
+                    },
+                    crate::fts::FieldValue {
+                        field_name: "tags",
+                        value: tags_value,
+                    },
+                ],
+            )
+            .map_err(|e| EngineError::Internal(format!("FTS index: {e}")))?;
+            fts.flush()
+                .map_err(|e| EngineError::Internal(format!("FTS flush: {e}")))?;
+        }
+
         Ok(memory)
     }
 
@@ -39,7 +80,12 @@ impl Engine {
         }
 
         // L1 miss — fetch from L2, populate L1.
-        match self.storage.read().unwrap().get_memory(id)? {
+        match self
+            .storage
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get_memory(id)?
+        {
             Some(memory) => {
                 self.cache.store(&key, CachedValue::Memory(memory.clone()));
                 Ok(Some(memory))
@@ -65,20 +111,115 @@ impl Engine {
                 ));
             }
         }
-        let memory = self.storage.write().unwrap().update_memory(id, patch)?;
+        let memory = self
+            .storage
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .update_memory(id, patch)?;
         let key = memory_cache_key(&id);
         self.cache.invalidate(&key);
+
+        // Re-index into L4 full-text search if enabled.
+        if let Some(ref fts) = self.fts_index {
+            let tags_value = if memory.tags.is_empty() {
+                String::new()
+            } else {
+                memory.tags.join(" ")
+            };
+            fts.index(
+                &memory.id.to_string(),
+                &[
+                    crate::fts::FieldValue {
+                        field_name: "content",
+                        value: memory.content.clone(),
+                    },
+                    crate::fts::FieldValue {
+                        field_name: "tags",
+                        value: tags_value,
+                    },
+                ],
+            )
+            .map_err(|e| EngineError::Internal(format!("FTS re-index: {e}")))?;
+            fts.flush()
+                .map_err(|e| EngineError::Internal(format!("FTS flush: {e}")))?;
+        }
+
         Ok(memory)
+    }
+
+    /// Retrieve multiple memories by their unique identifiers.
+    ///
+    /// **Policy:** Cache-aside for each ID, then batch-fetch any misses from storage.
+    pub fn get_memories(&self, ids: &[Uuid]) -> crate::error::EngineResult<Vec<Option<Memory>>> {
+        let mut results: Vec<Option<Memory>> = Vec::with_capacity(ids.len());
+        let mut miss_indices: Vec<usize> = Vec::new();
+        let mut miss_ids: Vec<Uuid> = Vec::new();
+
+        // Check cache first for each ID.
+        for (i, id) in ids.iter().enumerate() {
+            let key = memory_cache_key(id);
+            if let Some(cached) = self.cache.get(&key) {
+                match cached {
+                    CachedValue::Memory(m) => results.push(Some(m)),
+                    _ => results.push(None),
+                }
+            } else {
+                // Mark as cache miss — will batch-fetch from storage.
+                results.push(None);
+                miss_indices.push(i);
+                miss_ids.push(*id);
+            }
+        }
+
+        if miss_ids.is_empty() {
+            return Ok(results);
+        }
+
+        // Batch-fetch cache misses from storage.
+        let storage_results = self
+            .storage
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get_memories(&miss_ids)?;
+
+        // Populate cache and fill results for cache misses.
+        for (batch_idx, &result_idx) in miss_indices.iter().enumerate() {
+            if let Some(Some(memory)) = storage_results.get(batch_idx) {
+                let key = memory_cache_key(&memory.id);
+                self.cache.store(&key, CachedValue::Memory(memory.clone()));
+                results[result_idx] = Some(memory.clone());
+            }
+        }
+
+        Ok(results)
     }
 
     /// Permanently delete a memory.
     ///
     /// **Policy:** Invalidate.
     pub fn delete_memory(&self, id: Uuid) -> crate::error::EngineResult<()> {
-        self.telemetry.stats.memories_deleted.fetch_add(1, Ordering::Relaxed);
-        self.storage.write().unwrap().delete_memory(id)?;
+        self.telemetry
+            .stats
+            .memories_deleted
+            .fetch_add(1, Ordering::Relaxed);
+        self.storage
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .delete_memory(id)?;
         let key = memory_cache_key(&id);
         self.cache.invalidate(&key);
+
+        // Remove from L3 vector index if enabled (no-op if not found).
+        if let Some(ref vx) = self.vector_index {
+            let _ = vx.remove(&id.to_string());
+        }
+
+        // Remove from L4 full-text search if enabled.
+        if let Some(ref fts) = self.fts_index {
+            let _ = fts.delete(&id.to_string());
+            let _ = fts.flush();
+        }
+
         Ok(())
     }
 }

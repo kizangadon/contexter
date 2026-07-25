@@ -41,9 +41,17 @@ pub enum EngineError {
     #[error("Internal error: {0}")]
     Internal(String),
 
+    /// An invalid configuration was supplied.
+    #[error("Invalid configuration: {0}")]
+    InvalidConfig(String),
+
     /// A feature that has not been implemented yet (Phase 2 placeholder).
     #[error("Not implemented: {0}")]
     Unimplemented(String),
+
+    /// An operation was attempted on a disabled tier or unsupported feature.
+    #[error("Unsupported operation: {0}")]
+    UnsupportedOperation(String),
 }
 
 /// Convenience alias for `Result<T, EngineError>`.
@@ -64,8 +72,12 @@ impl EngineError {
             EngineError::Compression(_) => "Compression error".to_string(),
             EngineError::Cache(_) => "Cache error".to_string(),
             EngineError::Internal(_) => "Internal error".to_string(),
+            EngineError::InvalidConfig(msg) => format!("Invalid configuration: {msg}"),
             EngineError::Unimplemented(ref feature) => {
                 format!("Not implemented: {feature}")
+            }
+            EngineError::UnsupportedOperation(ref msg) => {
+                format!("Unsupported operation: {msg}")
             }
         }
     }
@@ -130,6 +142,15 @@ mod tests {
     fn engine_error_display_internal() {
         let err = EngineError::Internal("unexpected null".into());
         assert_eq!(err.to_string(), "Internal error: unexpected null");
+    }
+
+    #[test]
+    fn engine_error_display_invalid_config() {
+        let err = EngineError::InvalidConfig("embedding_dim must be >= 1".into());
+        assert_eq!(
+            err.to_string(),
+            "Invalid configuration: embedding_dim must be >= 1"
+        );
     }
 
     /// Verify that NotFound renders with both entity_type and id.
@@ -213,5 +234,26 @@ mod tests {
     fn sanitized_internal_is_generic() {
         let err = EngineError::Internal("unexpected null in thread pool".into());
         assert_eq!(err.sanitized(), "Internal error");
+    }
+
+    #[test]
+    fn sanitized_invalid_config_preserves_message() {
+        let err = EngineError::InvalidConfig("embedding_dim must be >= 1".into());
+        assert_eq!(
+            err.sanitized(),
+            "Invalid configuration: embedding_dim must be >= 1"
+        );
+    }
+
+    #[test]
+    fn engine_error_display_unsupported_operation() {
+        let err = EngineError::UnsupportedOperation("L3 tier disabled".into());
+        assert_eq!(err.to_string(), "Unsupported operation: L3 tier disabled");
+    }
+
+    #[test]
+    fn sanitized_unsupported_operation_preserves_message() {
+        let err = EngineError::UnsupportedOperation("vector index not enabled".into());
+        assert_eq!(err.sanitized(), "Unsupported operation: vector index not enabled");
     }
 }

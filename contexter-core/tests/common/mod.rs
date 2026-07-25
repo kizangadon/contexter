@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use contexter_core::{CacheConfig, Engine, NewSession, Session, SessionStatus, StorageConfig};
+use contexter_core::{CacheConfig, Engine, EngineConfig, NewSession, Session, SessionStatus, StorageConfig};
 use tempfile::TempDir;
 use uuid::Uuid;
 
@@ -18,11 +18,15 @@ pub fn setup_engine() -> (Engine, TempDir) {
 }
 
 /// Create a temporary Engine with a custom cache config.
+/// All optional tiers (vector, FTS, analytics) are disabled.
 pub fn setup_engine_with_config(config: CacheConfig) -> (Engine, TempDir) {
     let dir = TempDir::new().expect("temp dir");
-    let engine = Engine::with_config(StorageConfig {
-        path: dir.path().to_path_buf(),
-        cache_config: Some(config),
+    let engine = Engine::with_config(EngineConfig {
+        storage: StorageConfig {
+            path: dir.path().to_path_buf(),
+            cache_config: Some(config),
+        },
+        ..EngineConfig::default()
     })
     .expect("open with config");
     (engine, dir)

@@ -42,7 +42,7 @@ impl Engine {
     /// **Policy:** Write-through.
     pub fn create_skill(&self, new_skill: NewSkill) -> EngineResult<Skill> {
         Self::validate_file_path(&new_skill.file_path)?;
-        let skill = self.storage.write().unwrap().create_skill(new_skill)?;
+        let skill = self.storage.write().unwrap_or_else(|e| e.into_inner()).create_skill(new_skill)?;
         let key = skill_cache_key(&skill.id);
         self.cache.store(&key, CachedValue::Skill(skill.clone()));
         Ok(skill)
@@ -60,7 +60,7 @@ impl Engine {
         }
 
         // L1 miss — fetch from L2, populate L1.
-        match self.storage.read().unwrap().get_skill(id)? {
+        match self.storage.read().unwrap_or_else(|e| e.into_inner()).get_skill(id)? {
             Some(skill) => {
                 self.cache.store(&key, CachedValue::Skill(skill.clone()));
                 Ok(Some(skill))
@@ -76,13 +76,13 @@ impl Engine {
         let keys = self
             .storage
             .read()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .scan_cf_keys(CF_SKILLS, KEY_PREFIX_SKILL)?;
 
         let mut results = Vec::new();
 
         for chunk in keys.chunks(BATCH_SIZE) {
-            let storage = self.storage.read().unwrap();
+            let storage = self.storage.read().unwrap_or_else(|e| e.into_inner());
             for key_bytes in chunk {
                 let key_str = std::str::from_utf8(key_bytes).map_err(|e| {
                     EngineError::Internal(format!("invalid UTF-8 key: {e}"))
@@ -123,7 +123,7 @@ impl Engine {
     /// **Policy:** Write-around.
     pub fn update_skill(&self, id: Uuid, patch: &SkillPatch) -> EngineResult<Skill> {
         Self::validate_file_path(&patch.file_path)?;
-        let skill = self.storage.write().unwrap().update_skill(id, patch)?;
+        let skill = self.storage.write().unwrap_or_else(|e| e.into_inner()).update_skill(id, patch)?;
         let key = skill_cache_key(&id);
         self.cache.invalidate(&key);
         Ok(skill)
@@ -133,7 +133,7 @@ impl Engine {
     ///
     /// **Policy:** Invalidate.
     pub fn delete_skill(&self, id: Uuid) -> EngineResult<()> {
-        self.storage.write().unwrap().delete_skill(id)?;
+        self.storage.write().unwrap_or_else(|e| e.into_inner()).delete_skill(id)?;
         let key = skill_cache_key(&id);
         self.cache.invalidate(&key);
         Ok(())

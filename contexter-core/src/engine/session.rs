@@ -18,7 +18,7 @@ impl Engine {
     /// **Policy:** Write-through — persisted first, then cached.
     pub fn create_session(&self, new_session: NewSession) -> EngineResult<Session> {
         self.telemetry.stats.sessions_created.fetch_add(1, Ordering::Relaxed);
-        let session = self.storage.write().unwrap().create_session(new_session)?;
+        let session = self.storage.write().unwrap_or_else(|e| e.into_inner()).create_session(new_session)?;
         let key = session_cache_key(&session.id);
         self.cache.store(&key, CachedValue::Session(session.clone()));
         Ok(session)
@@ -37,7 +37,7 @@ impl Engine {
         }
 
         // L1 miss — fetch from L2, populate L1.
-        match self.storage.read().unwrap().get_session(id)? {
+        match self.storage.read().unwrap_or_else(|e| e.into_inner()).get_session(id)? {
             Some(session) => {
                 self.cache.store(&key, CachedValue::Session(session.clone()));
                 Ok(Some(session))
@@ -53,13 +53,13 @@ impl Engine {
         let keys = self
             .storage
             .read()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .scan_cf_keys(CF_SESSIONS, KEY_PREFIX_SESSION)?;
 
         let mut results = Vec::new();
 
         for chunk in keys.chunks(BATCH_SIZE) {
-            let storage = self.storage.read().unwrap();
+            let storage = self.storage.read().unwrap_or_else(|e| e.into_inner());
             for key_bytes in chunk {
                 let key_str = std::str::from_utf8(key_bytes).map_err(|e| {
                     EngineError::Internal(format!("invalid UTF-8 key: {e}"))
@@ -105,7 +105,7 @@ impl Engine {
     /// **Policy:** Write-around — persisted to L2 first, then the stale cache
     /// entry is invalidated so the next read re-fetches from L2.
     pub fn update_session(&self, id: Uuid, patch: &SessionPatch) -> EngineResult<Session> {
-        let session = self.storage.write().unwrap().update_session(id, patch)?;
+        let session = self.storage.write().unwrap_or_else(|e| e.into_inner()).update_session(id, patch)?;
         let key = session_cache_key(&id);
         self.cache.invalidate(&key);
         Ok(session)
@@ -116,7 +116,7 @@ impl Engine {
     /// **Policy:** Invalidate — deleted from L2, then evicted from L1.
     pub fn delete_session(&self, id: Uuid) -> EngineResult<()> {
         self.telemetry.stats.sessions_deleted.fetch_add(1, Ordering::Relaxed);
-        self.storage.write().unwrap().delete_session(id)?;
+        self.storage.write().unwrap_or_else(|e| e.into_inner()).delete_session(id)?;
         let key = session_cache_key(&id);
         self.cache.invalidate(&key);
         Ok(())
@@ -126,7 +126,7 @@ impl Engine {
     ///
     /// **Policy:** Bypass — always reads from L2.
     pub fn count_sessions(&self, filter: &SessionFilter) -> EngineResult<u64> {
-        self.storage.read().unwrap().count_sessions(filter)
+        self.storage.read().unwrap_or_else(|e| e.into_inner()).count_sessions(filter)
     }
 }
 
