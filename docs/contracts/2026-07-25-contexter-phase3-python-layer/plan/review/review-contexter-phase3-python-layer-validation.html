@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Validator Synthesis — Phase 3 Python Layer</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f8f6f2;
+  --surface: #ffffff;
+  --surface-elevated: #f0eee8;
+  --border: #e2ddd4;
+  --text: #2d2a24;
+  --text-secondary: #6b655a;
+  --text-dim: #9c9588;
+  --accent: #1e3a5f;
+  --accent-light: #e8edf3;
+  --gold: #d4a73a;
+  --gold-light: #faf3e0;
+  --green: #2d7d46;
+  --green-light: #e6f4eb;
+  --red: #b91c1c;
+  --red-light: #fce8e8;
+  --amber: #d97706;
+  --amber-light: #fef3c7;
+  --teal: #0891b2;
+  --teal-light: #e0f4f8;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.08);
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1814;
+    --surface: #26231e;
+    --surface-elevated: #2d2a24;
+    --border: #3d3932;
+    --text: #e8e2d8;
+    --text-secondary: #a09888;
+    --text-dim: #706858;
+    --accent: #4a7fbf;
+    --accent-light: #1e2a3a;
+    --gold: #d4a73a;
+    --gold-light: #2d2615;
+    --green: #4ade80;
+    --green-light: #1a2e22;
+    --red: #f87171;
+    --red-light: #2e1a1a;
+    --amber: #fbbf24;
+    --amber-light: #2d2415;
+    --teal: #22d3ee;
+    --teal-light: #142e32;
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 12px rgba(0,0,0,0.3);
+  }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+/* Hero */
+.hero {
+  background: linear-gradient(135deg, var(--accent) 0%, #0d1b2a 100%);
+  color: white;
+  padding: 64px 24px 48px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(212,167,58,0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { font-size: 2.4rem; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+.hero p { font-size: 1.1rem; opacity: 0.8; max-width: 600px; margin: 0 auto; }
+
+/* Hero stats row */
+.hero-stats {
+  display: flex; justify-content: center; gap: 48px;
+  margin-top: 32px;
+}
+.hero-stat { text-align: center; }
+.hero-stat__value {
+  font-size: 2.2rem; font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--gold);
+}
+.hero-stat__label { font-size: 0.85rem; opacity: 0.7; margin-top: 2px; }
+
+/* Section */
+.section {
+  padding: 48px 0;
+  border-bottom: 1px solid var(--border);
+}
+.section:last-child { border-bottom: none; }
+.section-label {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 24px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+.section-label__dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.card--hero {
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--gold);
+}
+.card__inner { padding: 24px; }
+.card h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* Grid */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.grid-iterations { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+/* Timeline */
+.timeline {
+  position: relative;
+  padding-left: 32px;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--border);
+}
+.timeline__item {
+  position: relative;
+  padding-bottom: 28px;
+}
+.timeline__item:last-child { padding-bottom: 0; }
+.timeline__dot {
+  position: absolute;
+  left: -24px;
+  top: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--surface);
+}
+.timeline__dot--done { background: var(--green); border-color: var(--green); }
+.timeline__dot--fail { background: var(--red); border-color: var(--red); }
+.timeline__dot--warn { background: var(--amber); border-color: var(--amber); }
+.timeline__title { font-weight: 600; font-size: 0.95rem; }
+.timeline__desc { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+
+/* Findings list */
+.findings-list { list-style: none; padding: 0; }
+.findings-list li {
+  padding: 6px 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.findings-list li:last-child { border-bottom: none; }
+.findings-list__severity {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.sev-high { background: var(--red-light); color: var(--red); }
+.sev-medium { background: var(--amber-light); color: var(--amber); }
+.sev-low { background: var(--teal-light); color: var(--teal); }
+.sev-info { background: var(--accent-light); color: var(--accent); }
+
+/* Badge */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.badge-green { background: var(--green-light); color: var(--green); }
+.badge-red { background: var(--red-light); color: var(--red); }
+.badge-amber { background: var(--amber-light); color: var(--amber); }
+.badge-blue { background: var(--accent-light); color: var(--accent); }
+
+/* Flow arrows */
+.flow-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+.flow-step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 20px;
+  text-align: center;
+  flex: 1;
+  max-width: 160px;
+}
+.flow-step__label { font-size: 0.75rem; font-weight: 600; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+.flow-step__count { font-size: 1.5rem; font-weight: 700; font-family: var(--font-mono); }
+.flow-arrow { font-size: 1.3rem; color: var(--text-dim); }
+
+/* Bug contract list */
+.bug-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.bug-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+}
+.bug-item__id { color: var(--text-dim); min-width: 62px; }
+.bug-item__desc { color: var(--text); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-iterations, .bug-list { grid-template-columns: 1fr; }
+  .hero-stats { flex-direction: column; gap: 16px; }
+  .hero h1 { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Validator Synthesis</h1>
+  <p>Phase 3 — Python API Layer · 30 Bug Contracts · 3 Iterations · Zero Findings</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat__value">608</div>
+      <div class="hero-stat__label">Tests Passing</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat__value">30</div>
+      <div class="hero-stat__label">Bug Contracts</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat__value">3</div>
+      <div class="hero-stat__label">Iterations</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat__value">54→0</div>
+      <div class="hero-stat__label">Findings</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat__value">26/26</div>
+      <div class="hero-stat__label">ACs Passed</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- Phase 4 Baseline -->
+<div class="section">
+  <div class="section-label"><span class="section-label__dot" style="background:var(--accent)"></span><span>Phase 4 Baseline</span></div>
+  <h2>Initial Validation — 54 Findings</h2>
+
+  <div class="grid-3">
+    <div class="card card--hero">
+      <div class="card__inner">
+        <h3>🔍 Code Reviewer</h3>
+        <div style="font-size:2rem;font-weight:700;font-family:var(--font-mono);color:var(--red);margin:8px 0">17</div>
+        <p style="font-size:0.85rem;color:var(--text-secondary)">Code quality, test structure, naming, standards</p>
+      </div>
+    </div>
+    <div class="card card--hero">
+      <div class="card__inner">
+        <h3>🛡️ Security Architect</h3>
+        <div style="font-size:2rem;font-weight:700;font-family:var(--font-mono);color:var(--red);margin:8px 0">16</div>
+        <p style="font-size:0.85rem;color:var(--text-secondary)">Auth, secrets, input validation, rate limiting</p>
+      </div>
+    </div>
+    <div class="card card--hero">
+      <div class="card__inner">
+        <h3>⚡ Performance</h3>
+        <div style="font-size:2rem;font-weight:700;font-family:var(--font-mono);color:var(--red);margin:8px 0">13</div>
+        <p style="font-size:0.85rem;color:var(--text-secondary)">Sync I/O, thread pool, pagination, logging</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card__inner">
+        <h3>🧪 User-Testing</h3>
+        <div style="font-size:2rem;font-weight:700;font-family:var(--font-mono);color:var(--amber);margin:8px 0">3</div>
+        <p style="font-size:0.85rem;color:var(--text-secondary)">Startup issues, health, path traversal</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card__inner">
+        <h3>📋 SPEC Compliance</h3>
+        <div style="font-size:2rem;font-weight:700;font-family:var(--font-mono);color:var(--amber);margin:8px 0">3</div>
+        <p style="font-size:0.85rem;color:var(--text-secondary)">Missing MCP auth, pagination defaults</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card__inner">
+        <h3>🎨 Design Compliance</h3>
+        <div style="font-size:2rem;font-weight:700;font-family:var(--font-mono);color:var(--amber);margin:8px 0">2</div>
+        <p style="font-size:0.85rem;color:var(--text-secondary)">Wireframe alignment, component hierarchy</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;text-align:center;padding:16px;background:var(--surface-elevated);border-radius:var(--radius-sm)">
+    <span class="badge badge-red">54 findings total</span>
+    <span style="margin-left:12px;font-size:0.85rem;color:var(--text-secondary)">→ Auto Bug Loop triggered with 13 bug contracts</span>
+  </div>
+</div>
+
+<!-- Iteration 1 -->
+<div class="section">
+  <div class="section-label"><span class="section-label__dot" style="background:var(--gold)"></span><span>Iteration 1</span></div>
+  <h2>13 Bug Contracts — Bridge, Security, Services</h2>
+
+  <div class="grid-2">
+    <div>
+      <div class="bug-list">
+        <div class="bug-item"><span class="bug-item__id">BUG-001</span><span class="bug-item__desc">Bridge log method + wiring</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-002</span><span class="bug-item__desc">Bridge bare except fix</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-003</span><span class="bug-item__desc">Bridge byte-length for content</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-004</span><span class="bug-item__desc">Settings async I/O + AnalyticsConfig</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-005</span><span class="bug-item__desc">Typed API endpoints</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-006</span><span class="bug-item__desc">Security middleware stack</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-007</span><span class="bug-item__desc">In-memory persistence</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-008</span><span class="bug-item__desc">Search pagination</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-009</span><span class="bug-item__desc">Parallelization</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-010</span><span class="bug-item__desc">CLI f-strings</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-011</span><span class="bug-item__desc">Code quality nits I</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-012</span><span class="bug-item__desc">Code quality nits II</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-013</span><span class="bug-item__desc">Code quality nits III</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card__inner">
+          <h3>Results</h3>
+          <ul class="findings-list">
+            <li><span class="findings-list__severity sev-high">HIGH</span> Code Reviewer: 0 (cleared)</li>
+            <li><span class="findings-list__severity sev-high">HIGH</span> Security Architect: 0 (cleared)</li>
+            <li><span class="findings-list__severity sev-medium">MED</span> Performance: 0 (cleared)</li>
+            <li><span class="findings-list__severity sev-low">LOW</span> User-Testing: 0 (cleared)</li>
+            <li><span class="findings-list__severity sev-low">LOW</span> SPEC Compliance: 0 (cleared)</li>
+            <li><span class="findings-list__severity sev-info">INFO</span> Design Compliance: 0 (cleared)</li>
+          </ul>
+          <div style="margin-top:12px;padding:10px;background:var(--green-light);border-radius:6px;font-size:0.88rem;color:var(--green)">
+            13/13 contracts resolved. Tests: 406 → 537.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Iteration 2 -->
+<div class="section">
+  <div class="section-label"><span class="section-label__dot" style="background:var(--gold)"></span><span>Iteration 2</span></div>
+  <h2>14 Bug Contracts — Auth, Hardening, Governance</h2>
+
+  <div class="grid-2">
+    <div>
+      <div class="bug-list">
+        <div class="bug-item"><span class="bug-item__id">BUG-014</span><span class="bug-item__desc">API key leak redaction</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-015</span><span class="bug-item__desc">Export truncation fix</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-016</span><span class="bug-item__desc">Body size hardening</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-017</span><span class="bug-item__desc">Timing-safe auth</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-018</span><span class="bug-item__desc">File diff TODO</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-019</span><span class="bug-item__desc">MCP auth enforcement</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-020</span><span class="bug-item__desc">Rate limiting</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-021</span><span class="bug-item__desc">Chatty bridge logging</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-022</span><span class="bug-item__desc">ThreadPool configurable</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-023</span><span class="bug-item__desc">MCP graceful shutdown</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-024</span><span class="bug-item__desc">Duplicated validation</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-025</span><span class="bug-item__desc">Type shadow fix</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-026</span><span class="bug-item__desc">Redundant check</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-027</span><span class="bug-item__desc">structlog async config</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card__inner">
+          <h3>Results</h3>
+          <ul class="findings-list">
+            <li><span class="findings-list__severity sev-high">HIGH</span> Code Reviewer: 3 remaining (minor)</li>
+            <li><span class="findings-list__severity sev-high">HIGH</span> Security Architect: 7 remaining</li>
+            <li><span class="findings-list__severity sev-medium">MED</span> Performance: 9 remaining</li>
+            <li><span class="findings-list__severity sev-low">LOW</span> User-Testing: 0 (cleared)</li>
+            <li><span class="findings-list__severity sev-low">LOW</span> SPEC Compliance: 0 (cleared)</li>
+            <li><span class="findings-list__severity sev-info">INFO</span> Design Compliance: 0 (cleared)</li>
+          </ul>
+          <div style="margin-top:12px;padding:10px;background:var(--amber-light);border-radius:6px;font-size:0.88rem;color:var(--amber)">
+            19 findings → 3 bug contracts (BUG-028/029/030). Tests: 537 → 590.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Iteration 3 -->
+<div class="section">
+  <div class="section-label"><span class="section-label__dot" style="background:var(--green)"></span><span>Iteration 3</span></div>
+  <h2>3 Bug Contracts — Final Hardening</h2>
+
+  <div class="grid-2">
+    <div>
+      <div class="bug-list">
+        <div class="bug-item"><span class="bug-item__id">BUG-028</span><span class="bug-item__desc">MCP auth timing-safe (hmac.compare_digest)</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-029</span><span class="bug-item__desc">4 MCP resource handlers enforce auth</span></div>
+        <div class="bug-item"><span class="bug-item__id">BUG-030</span><span class="bug-item__desc">Path confinement (os.path.commonpath)</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="card card--hero">
+        <div class="card__inner">
+          <h3>✅ All Clear — Zero Findings</h3>
+          <ul class="findings-list">
+            <li><span class="findings-list__severity sev-low">INFO</span> Code Reviewer: 0 findings</li>
+            <li><span class="findings-list__severity sev-low">INFO</span> Security Architect: 0 findings</li>
+            <li><span class="findings-list__severity sev-low">INFO</span> Performance: 0 findings</li>
+            <li><span class="findings-list__severity sev-low">INFO</span> User-Testing: 0 findings</li>
+            <li><span class="findings-list__severity sev-low">INFO</span> SPEC Compliance: 0 findings</li>
+            <li><span class="findings-list__severity sev-low">INFO</span> Design Compliance: 0 findings</li>
+          </ul>
+          <div style="margin-top:12px;padding:10px;background:var(--green-light);border-radius:6px;font-size:0.88rem;color:var(--green)">
+            Auto Bug Loop terminated successfully. Tests: 590 → 608.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Key Improvements -->
+<div class="section">
+  <div class="section-label"><span class="section-label__dot" style="background:var(--teal)"></span><span>Security + Quality</span></div>
+  <h2>Key Improvements Delivered</h2>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card__inner">
+        <h3>🛡️ Security Hardening</h3>
+        <ul class="findings-list">
+          <li>Timing-safe auth via <code>hmac.compare_digest()</code> (REST + MCP)</li>
+          <li>API key redacted from settings export</li>
+          <li>Body size limit: 1 MB, chunked encoding rejected</li>
+          <li>Rate limiting: 100 req/min via slowapi</li>
+          <li>MCP auth: 8 tools + 4 resources enforce key</li>
+          <li>Path traversal: <code>os.path.commonpath</code> confinement</li>
+          <li>Security headers + TrustedHost middleware</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card__inner">
+        <h3>⚡ Performance</h3>
+        <ul class="findings-list">
+          <li>Thread pool: configurable via <code>CONtexTER_BRIDGE_POOL_SIZE</code></li>
+          <li>Bridge logging consolidated to 1 line on success</li>
+          <li>Early truncation in logging (pre-Pydantic)</li>
+          <li>Export pagination: explicit <code>limit=10_000</code></li>
+          <li>MCP graceful shutdown via <code>threading.Event</code></li>
+          <li>structlog async-safe configuration</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card__inner">
+        <h3>🧹 Code Quality</h3>
+        <ul class="findings-list">
+          <li>Duplicated <code>_validate_id_length()</code> extracted to <code>deps.py</code></li>
+          <li>Type shadow <code>type</code> → <code>notification_type</code></li>
+          <li>Redundant <code>".."</code> check removed (path lib handles it)</li>
+          <li>Bare <code>except:</code> → specific exception types</li>
+          <li>F-string interpolation in all CLI output</li>
+          <li>Content size check: byte-length, not character-length</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- File Map -->
+<div class="section" style="border:none">
+  <div class="section-label"><span class="section-label__dot" style="background:var(--accent)"></span><span>Files Changed</span></div>
+  <h2>New & Modified Files</h2>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card__inner">
+        <h3>New Files</h3>
+        <div class="bug-list">
+          <div class="bug-item"><span class="bug-item__id">NEW</span><span class="bug-item__desc"><code>mcp_tools/auth.py</code> — MCP auth helper</span></div>
+          <div class="bug-item"><span class="bug-item__id">NEW</span><span class="bug-item__desc"><code>rate_limiter.py</code> — slowapi factory</span></div>
+          <div class="bug-item"><span class="bug-item__id">NEW</span><span class="bug-item__desc"><code>models/feedback.py</code> — Pydantic models</span></div>
+          <div class="bug-item"><span class="bug-item__id">NEW</span><span class="bug-item__desc"><code>models/sessions.py</code> — Session models</span></div>
+          <div class="bug-item"><span class="bug-item__id">NEW</span><span class="bug-item__desc"><code>services/feedback_service.py</code></span></div>
+          <div class="bug-item"><span class="bug-item__id">NEW</span><span class="bug-item__desc"><code>services/correlation_service.py</code></span></div>
+          <div class="bug-item"><span class="bug-item__id">NEW</span><span class="bug-item__desc"><code>services/export_service.py</code></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card__inner">
+        <h3>Modified Files (key)</h3>
+        <div class="bug-list">
+          <div class="bug-item"><span class="bug-item__id">MOD</span><span class="bug-item__desc"><code>core/bridge.py</code> — logging, pool, bytes</span></div>
+          <div class="bug-item"><span class="bug-item__id">MOD</span><span class="bug-item__desc"><code>main.py</code> — middleware, rate limit, lifespan</span></div>
+          <div class="bug-item"><span class="bug-item__id">MOD</span><span class="bug-item__desc"><code>api/deps.py</code> — validate_id_length, hmac</span></div>
+          <div class="bug-item"><span class="bug-item__id">MOD</span><span class="bug-item__desc"><code>api/files.py</code> — path confinement</span></div>
+          <div class="bug-item"><span class="bug-item__id">MOD</span><span class="bug-item__desc"><code>mcp_server.py</code> — auth checks, shutdown</span></div>
+          <div class="bug-item"><span class="bug-item__id">MOD</span><span class="bug-item__desc"><code>mcp_tools/handlers.py</span></code></div>
+          <div class="bug-item"><span class="bug-item__id">MOD</span><span class="bug-item__desc"><code>services/settings_service.py</span></code></div>
+          <div class="bug-item"><span class="bug-item__id">MOD</span><span class="bug-item__desc"><code>cli/status_commands.py</span></code></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
