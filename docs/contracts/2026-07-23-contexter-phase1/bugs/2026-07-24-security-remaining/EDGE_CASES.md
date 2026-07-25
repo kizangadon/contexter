@@ -1,0 +1,3 @@
+- Depth limiting should not reject normal valid JSON (depth < 64)
+- update_memory with empty content should succeed
+- Skill.file_path validation should allow relative paths if intended

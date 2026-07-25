@@ -1,0 +1,3 @@
+- Removing inserted_at: ensure no code references it
+- WriteBatch: method exists but may not be called yet (Phase 2+)
+- Chunked iteration: correctness must be maintained

@@ -1,0 +1,3 @@
+- Read-only path test on non-Unix: should be skipped gracefully
+- Python async wrapper with invalid path: should raise on construction
+- Python async wrapper concurrent calls: ThreadPoolExecutor should handle 4 simultaneous calls

@@ -1,0 +1,2 @@
+- serde_json's default recursion limit is 128 — deeper JSON than that will get a serde error instead of the custom "nesting depth exceeds limit" message
+- If a custom error message is required, add `serde_json::Deserializer::new(s).disable_recursion_limit()` and implement a custom depth tracker inside a custom Deserializer wrapper, but this is overkill for Phase 1

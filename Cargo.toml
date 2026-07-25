@@ -1,0 +1,3 @@
+[workspace]
+members = ["contexter-core"]
+resolver = "2"

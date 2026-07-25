@@ -1,0 +1,4 @@
+- `tests/common/fixtures.rs` is included via `#[path]` from `tests/common/mod.rs` — the mod.rs file must be updated to include it
+- `Cargo.toml` may need `[[test]]` entries for the new test files
+- Search tests need at least one memory with content to search against
+- CF tests should not depend on specific RocksDB internals

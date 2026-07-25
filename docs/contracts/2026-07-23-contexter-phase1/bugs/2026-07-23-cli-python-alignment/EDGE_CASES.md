@@ -1,0 +1,5 @@
+- `status` on uninitialized empty DB: should show zeros, not crash
+- `checkpoint` on idle DB: flush should succeed with no data
+- `catch_unwind` wrapping a no-op: should return normally
+- `delete_session` on non-existent ID: should return None, not error
+- `list_sessions` with empty filter: should return all sessions (default offset/limit)

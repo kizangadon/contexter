@@ -1,0 +1,3 @@
+- [ ] REQ-BPY-001: `cargo check --features python 2>&1 | grep -i error` shows 0 errors
+- [ ] `cargo build --workspace` still succeeds
+- [ ] `cargo test --workspace` still succeeds

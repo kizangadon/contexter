@@ -1,0 +1,5 @@
+- [ ] REQ-MOD-001: `src/error.rs` moved to `src/error/mod.rs`; all existing `use crate::error::*` imports compile; `pub mod error;` in lib.rs unchanged
+- [ ] REQ-MOD-002: `src/cli.rs` moved to `src/cli/mod.rs`; all imports compile
+- [ ] REQ-MOD-003: `pub use models::*;` replaced with explicit re-exports for each model type
+- [ ] Compiles: `cargo build --workspace` succeeds
+- [ ] Tests pass: `cargo test --workspace` succeeds (269+)

@@ -1,0 +1,2 @@
+- Other CF zstd levels (session level 3, memory_items level 3) must remain unchanged
+- LZ4 CFs must remain unchanged

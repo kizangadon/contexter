@@ -1,0 +1,3 @@
+- Git mv should preserve file history: `git mv src/error.rs src/error/mod.rs`
+- `cli.rs` inline tests reference `super::*` which brings in `crate::*` — verify they still resolve
+- Explicit re-exports must include ALL model types that are used elsewhere via `pub use models::*;` — grep for `crate::models::` to find which types are consumed

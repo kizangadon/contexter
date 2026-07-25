@@ -1,0 +1,3 @@
+- AC-1: `cargo fmt --check` passes on all source files
+- AC-2: `cargo test` passes after formatting
+- AC-3: `cargo clippy --all-targets -- -D warnings` is clean

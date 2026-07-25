@@ -1,0 +1,7 @@
+- LZ4 decompress of empty input: should return empty vec (not error)
+- Memory content exactly 1MB: should succeed (boundary)
+- Memory content exactly 1MB+1 byte: should be rejected
+- Setting key of 256 chars: should succeed
+- Setting key of 257 chars: should be rejected
+- `sanitized()` on all EngineError variants: should not leak entity IDs
+- CLI path validation on non-existent path: should create the directory (not error)

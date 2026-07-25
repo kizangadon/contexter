@@ -1,0 +1,5 @@
+- [ ] REQ-CFA-001: `CF_SETTINGS` exists, settings use it, all setting CRUD works correctly
+- [ ] REQ-CFA-002: `CF_AUDIT` exists, audit entries use it, all audit CRUD works correctly
+- [ ] REQ-CFA-003: Session list/count uses secondary index for project, agent_id, and status filters; filtered queries are more efficient than full scan
+- [ ] Compiles: `cargo build --workspace` succeeds
+- [ ] Tests pass: `cargo test --workspace` succeeds (269+)

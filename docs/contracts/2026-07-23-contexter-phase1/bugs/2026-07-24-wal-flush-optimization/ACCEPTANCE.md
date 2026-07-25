@@ -1,0 +1,5 @@
+- AC-1: `RocksDbConfig` has `wal_sync: bool` field defaulting to `true`
+- AC-2: When `wal_sync = true`, existing behavior is preserved (flush_wal on every write)
+- AC-3: When `wal_sync = false`, mutating operations skip `flush_wal` calls
+- AC-4: `cargo test` passes
+- AC-5: `cargo clippy --all-targets -- -D warnings` is clean

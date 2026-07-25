@@ -1,0 +1,4 @@
+- StorageConfig with non-existent path: Engine::open should create it
+- Generic store with empty key: should error
+- Generic get with non-existent key: should return None
+- SharedBackend with 0 backends: shouldn't compile (trait bound)

@@ -1,0 +1,3 @@
+- Internal raw storage methods (`store_raw`, `get_raw` on `StorageBackend` + `RocksDbBackend`) must retain `&[u8]`/`Vec<u8>` signatures — the bridge-only methods (`Engine::store`, `Engine::get`) change
+- All tests that call `Engine::store()` or `Engine::get()` must be updated to pass &str
+- Bridge tests using `create_memory_bytes` and `update_memory_bytes` pass `&[u8]` content (those methods parse content as UTF-8 internally, so they should remain unchanged)

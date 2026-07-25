@@ -1,0 +1,3 @@
+- Multiple filters combined should AND them
+- Empty filters should return all results (fallback to full scan)
+- Filter with no matches returns empty vec

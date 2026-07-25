@@ -1,0 +1,2 @@
+- Python feature disabled: default-features build must still pass
+- Deeply nested JSON input: recursion depth protection still works

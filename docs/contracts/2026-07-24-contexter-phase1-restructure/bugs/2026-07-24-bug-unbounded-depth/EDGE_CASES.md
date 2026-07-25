@@ -1,0 +1,2 @@
+- serde_json default recursion limit is 128 — any JSON deeper than that will get a "recursion limit exceeded" error
+- No existing functionality should depend on JSON deeper than 128 levels

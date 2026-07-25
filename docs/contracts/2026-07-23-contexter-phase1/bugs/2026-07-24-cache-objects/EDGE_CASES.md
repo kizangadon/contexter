@@ -1,0 +1,3 @@
+- Cache miss still falls through to RocksDB correctly
+- Cache eviction (LRU) still works with typed objects
+- Thread safety: typed objects must be Send + Sync

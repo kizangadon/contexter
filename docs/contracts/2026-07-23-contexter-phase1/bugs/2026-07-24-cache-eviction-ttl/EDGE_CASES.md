@@ -1,0 +1,3 @@
+- TTL=0 should evict immediately on next access
+- TTL=None should preserve legacy LRU-only behavior
+- Expired entry removal should not propagate errors up to callers

@@ -6,3 +6,12 @@
 .superpowers/
 
 docs/Prompt.md
+
+# Build artifacts
+target/
+
+# Supervisor state
+.supervisors/
+
+# Cargo local config
+.cargo/

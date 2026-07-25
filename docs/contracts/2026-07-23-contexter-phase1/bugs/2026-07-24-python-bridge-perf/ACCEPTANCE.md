@@ -1,0 +1,4 @@
+- AC-1: `core_bridge.py` Engine constructor accepts `max_workers` param (default=4)
+- AC-2: Large memories (>100KB) use PyBytes path instead of JSON round-trip
+- AC-3: `cargo test` passes
+- AC-4: `cargo clippy --all-targets -- -D warnings` is clean

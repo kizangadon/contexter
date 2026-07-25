@@ -1,0 +1,3 @@
+- Index write must be atomic with main entity write (in same WriteBatch)
+- Full scan fallback still works for unindexed queries (keyword-only search)
+- estimate-num-keys is approximate; exact counts still use scan for precision

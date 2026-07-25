@@ -1,0 +1,2 @@
+- No semantic changes from formatting
+- If rustfmt changes break anything, fix manually

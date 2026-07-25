@@ -1,0 +1,4 @@
+- [ ] REQ-TST-001: `tests/common/fixtures.rs` exists with at least TEST_PROJECT, TEST_AGENT_ID, setup_engine, setup_rocksdb; `tests/common/mod.rs` declares `pub mod fixtures;`
+- [ ] REQ-TST-002: `tests/storage/column_families_test.rs` exists and tests CF names and ColumnFamilyMap
+- [ ] REQ-TST-003: `tests/engine/search_test.rs` exists and tests search with session_id, memory_type, tags, keywords, multi-keyword scoring, pagination
+- [ ] Tests pass: `cargo test --workspace` succeeds

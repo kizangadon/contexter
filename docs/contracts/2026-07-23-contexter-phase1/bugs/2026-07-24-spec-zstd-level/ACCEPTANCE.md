@@ -1,0 +1,3 @@
+- AC-1: Conflicts CF zstd level explicitly set to 1 (not level 3)
+- AC-2: `cargo test` passes
+- AC-3: `cargo clippy --all-targets -- -D warnings` is clean

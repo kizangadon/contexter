@@ -1,0 +1,4 @@
+- [ ] REQ-DSY-001: `store_raw` does NOT call `set_sync(true)` on WriteOptions
+- [ ] `store_raw` still calls `maybe_flush_wal()` after writing (data durability preserved)
+- [ ] `cargo build --workspace` succeeds
+- [ ] `cargo test --workspace` succeeds (all tests pass)

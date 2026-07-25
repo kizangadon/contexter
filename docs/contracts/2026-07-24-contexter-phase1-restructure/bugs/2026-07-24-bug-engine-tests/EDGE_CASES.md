@@ -1,0 +1,4 @@
+- `super::*` imports in the inline tests refer to `engine::*` — extracted test files must use `use contexter_core::*` or appropriate crate imports
+- The `setup()` helper function (lines 216-219) is duplicated across extracted files — use `common::fixtures::setup_engine()` instead
+- Test names must be preserved to avoid confusion in test output
+- `#[cfg(test)]` module attributes in the extracted files are unnecessary — integration test files are only compiled for testing

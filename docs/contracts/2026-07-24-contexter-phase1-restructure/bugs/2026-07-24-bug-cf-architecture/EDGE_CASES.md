@@ -1,0 +1,5 @@
+- Migration: Existing databases that already have settings in CF_SESSIONS will NOT have their data migrated. This is acceptable for a pre-release codebase. Document the breaking change.
+- The CF count changes from 9 to 11 (adding CF_SETTINGS and CF_AUDIT)
+- `ColumnFamilyMap::iter()` must return all 11 CFs
+- `storage_size` report must include the 2 new CFs
+- `test_engine_init_creates_cfs` test must update its assertion to expect 11 CFs

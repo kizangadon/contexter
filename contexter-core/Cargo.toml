@@ -1,0 +1,126 @@
+[package]
+name = "contexter-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+dirs = "5"
+rocksdb = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dashmap = "5"
+lru = "0.12"
+thiserror = "1"
+tracing = "0.1"
+sha2 = "0.10"
+similar = "2"
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py312"], optional = true }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+zstd = { version = "0.13", optional = true }
+lz4 = { version = "1.24", optional = true }
+
+[features]
+default = ["compression"]
+compression = ["zstd", "lz4"]
+python = ["pyo3"]
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.clippy]
+# PyO3 v0.22 #[pymethods] proc macro wraps return types in PyResult
+# automatically, making explicit PyResult<T> returns a "useless conversion"
+# of PyErr → PyErr. This is a known interaction and not a real concern.
+useless_conversion = "allow"
+
+[lib]
+name = "contexter_core"
+crate-type = ["lib", "cdylib"]
+
+[[bin]]
+name = "contexter"
+path = "src/bin/cli/mod.rs"
+
+[[test]]
+name = "rocksdb_test"
+path = "tests/storage/rocksdb_test.rs"
+
+[[test]]
+name = "lru_test"
+path = "tests/cache/lru_test.rs"
+
+[[test]]
+name = "codecs_test"
+path = "tests/compression/codecs_test.rs"
+
+[[test]]
+name = "session_test"
+path = "tests/engine/session_test.rs"
+
+[[test]]
+name = "memory_test"
+path = "tests/engine/memory_test.rs"
+
+[[test]]
+name = "agent_skill_test"
+path = "tests/engine/agent_skill_test.rs"
+
+[[test]]
+name = "settings_test"
+path = "tests/engine/settings_test.rs"
+
+[[test]]
+name = "maintenance_test"
+path = "tests/engine/maintenance_test.rs"
+
+[[test]]
+name = "error_test"
+path = "tests/engine/error_test.rs"
+
+[[test]]
+name = "pyo3_test"
+path = "tests/bridges/pyo3_test.rs"
+
+[[test]]
+name = "bridge_mod_test"
+path = "tests/bridges/mod_test.rs"
+
+[[test]]
+name = "compression_mod_test"
+path = "tests/compression/mod_test.rs"
+
+[[test]]
+name = "utils_mod_test"
+path = "tests/utils/mod_test.rs"
+
+[[test]]
+name = "models_mod_test"
+path = "tests/models/mod_test.rs"
+
+[[test]]
+name = "storage_mod_test"
+path = "tests/storage/mod_test.rs"
+
+[[test]]
+name = "column_families_test"
+path = "tests/storage/column_families_test.rs"
+
+[[test]]
+name = "search_test"
+path = "tests/engine/search_test.rs"
+
+[[test]]
+name = "engine-construction-test"
+path = "tests/engine/construction_test.rs"
+
+[[test]]
+name = "engine-telemetry-test"
+path = "tests/engine/telemetry_test.rs"
+
+[[test]]
+name = "engine-send-sync-test"
+path = "tests/engine/send_sync_test.rs"

@@ -1,0 +1,4 @@
+- [ ] REQ-UBD-001: `serde_json` dependency in Cargo.toml does NOT include `unbounded_depth` feature
+- [ ] `cargo build --workspace` succeeds
+- [ ] `cargo test --workspace` succeeds (no regressions)
+- [ ] Deeply nested JSON (>128 levels) is rejected with a serde error (not a crash)

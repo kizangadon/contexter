@@ -1,0 +1,2 @@
+- Check `cargo check --features python 2>&1 | grep "warning"` for any new warnings
+- The hit_ratio computation should handle divide-by-zero (when total_ops=0)

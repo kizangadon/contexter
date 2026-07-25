@@ -1,0 +1,7 @@
+- [ ] REQ-CRD-001: `crdt/mod.rs` defines `LwwRegister<T>` with value, logical_clock, wall_clock
+- [ ] `new(value: T) -> Self` constructor exists
+- [ ] `merge(self, other: LwwRegister<T>) -> LwwRegister<T>` method exists, delegates to `lww_merge`
+- [ ] `value(&self) -> &T` accessor exists
+- [ ] `cargo build --workspace` succeeds
+- [ ] `cargo test --workspace` succeeds (352+ tests)
+- [ ] Inline `#[cfg(test)]` tests verify merge logic

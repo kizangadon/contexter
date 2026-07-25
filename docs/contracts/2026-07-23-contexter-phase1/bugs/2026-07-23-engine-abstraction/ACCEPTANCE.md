@@ -1,0 +1,10 @@
+- AC-1: `SharedBackend` type alias exists in `storage/mod.rs`
+- AC-2: `Engine` uses `SharedBackend` not concrete `RocksDbBackend`
+- AC-3: `Engine::store(cf, key, value)` writes to any CF by name
+- AC-4: `Engine::get(cf, key)` reads from any CF by name
+- AC-5: `PyEngine::store(cf, key, value)` proxies generic store
+- AC-6: `PyEngine::get(cf, key)` proxies generic get
+- AC-7: `StorageConfig` struct exists with path and optional cache_config
+- AC-8: CLI default path is `~/.contexter/`
+- AC-9: `cargo test` passes
+- AC-10: `cargo clippy -- -D warnings` is clean

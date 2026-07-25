@@ -1,0 +1,6 @@
+- AC-1: search_memories with memory_type filter returns only matching memories
+- AC-2: search_memories with tags filter returns only matching memories
+- AC-3: search_memories with session_id filter returns only matching memories
+- AC-4: Integration tests exist for each filter
+- AC-5: `cargo test` passes
+- AC-6: `cargo clippy --all-targets -- -D warnings` is clean

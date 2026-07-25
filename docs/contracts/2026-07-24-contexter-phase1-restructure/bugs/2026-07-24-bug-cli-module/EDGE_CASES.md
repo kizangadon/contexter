@@ -1,0 +1,3 @@
+- The binary entry point `src/bin/cli/mod.rs` is separate and should NOT be affected
+- Cargo automatically finds `cli/mod.rs` when `mod cli;` is declared in `lib.rs` — no Cargo.toml changes needed
+- `pub use` re-exports from `cli/mod.rs` must match what was previously in `cli.rs`

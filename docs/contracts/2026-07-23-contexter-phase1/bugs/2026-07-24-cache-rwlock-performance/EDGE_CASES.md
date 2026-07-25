@@ -1,0 +1,4 @@
+- TTL eviction should not error on empty cache
+- Chunked iteration must still return complete results
+- WriteBatch method can be empty/unimplemented for Phase 1 (just the signature)
+- storage_size batching must still return correct per-CF sizes

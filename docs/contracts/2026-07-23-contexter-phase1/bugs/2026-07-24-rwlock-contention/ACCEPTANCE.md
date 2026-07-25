@@ -1,0 +1,6 @@
+- AC-1: Long-running search/list operations release read lock between batch reads
+- AC-2: `storage_size()` batches property queries (reduced from 24 lock acquisitions)
+- AC-3: `WriteBatch` method exists on `RocksDbBackend` for future use
+- AC-4: `inserted_at` removed from `CacheEntry` (no dead code)
+- AC-5: `cargo test` passes
+- AC-6: `cargo clippy --all-targets -- -D warnings` is clean

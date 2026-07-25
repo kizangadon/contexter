@@ -1,0 +1,3 @@
+- Engine::store signature: `fn store(&self, cf_name: &str, key: &str, value: &str) -> EngineResult<()>`
+- Engine::get signature: `fn get(&self, cf_name: &str, key: &str) -> EngineResult<Option<String>>`
+- The `catch_panic` wrapper and `map_err(map_err)` should remain unchanged

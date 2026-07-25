@@ -1,0 +1,4 @@
+- [ ] REQ-DED-001: `MemorySearchQuery.project` has `#[serde(skip)]` + `#[allow(dead_code)]` with a Phase 2 comment
+- [ ] Compiles without warnings: `cargo build --workspace` succeeds with no dead_code warnings for this field
+- [ ] Tests pass: `cargo test --workspace` succeeds
+- [ ] JSON parsing: existing search queries with `"project": "foo"` still parse (they're silently ignored)
