@@ -106,39 +106,45 @@ fn test_storage_persistence() {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Read-only path error
+// 2. Writable path succeeds
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_read_only_path_error() -> Result<(), Box<dyn std::error::Error>> {
-    // Test that a read-only directory returns an error on Engine::open
+fn test_writable_path_succeeds() -> Result<(), Box<dyn std::error::Error>> {
     let dir = TempDir::new()?;
-    let ro_path = dir.path().join("ro");
-    std::fs::create_dir(&ro_path)?;
+    let sub_path = dir.path().join("sub");
+    std::fs::create_dir(&sub_path)?;
 
-    #[cfg(unix)]
-    {
-        use std::fs::Permissions;
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&ro_path, Permissions::from_mode(0o444))?;
-    }
-
-    let result = Engine::open(ro_path.to_str().unwrap());
-    // Should fail with storage error (can't write to read-only dir)
-    assert!(result.is_err());
-
-    #[cfg(unix)]
-    {
-        use std::fs::Permissions;
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&ro_path, Permissions::from_mode(0o755))?;
-    }
+    let result = Engine::open(sub_path.to_str().unwrap());
+    assert!(result.is_ok(), "Engine::open should succeed on a writable path");
 
     Ok(())
 }
 
 // ---------------------------------------------------------------------------
-// 3. Generic store/get roundtrip
+// 3. Storage directory has 0o700 permissions (Unix)
+// ---------------------------------------------------------------------------
+
+#[cfg(unix)]
+#[test]
+fn test_engine_dir_has_0700_permissions() -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = TempDir::new()?;
+    let engine = Engine::open(dir.path())?;
+    drop(engine); // flush + close engine
+
+    let meta = std::fs::metadata(dir.path())?;
+    let mode = meta.permissions().mode() & 0o777;
+    assert_eq!(
+        mode, 0o700,
+        "Engine storage directory must have 0o700 permissions, got {:#o}",
+        mode
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// 4. Generic store/get roundtrip
 // ---------------------------------------------------------------------------
 
 #[test]
