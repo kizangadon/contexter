@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phase 4 Scaffold — Implementation Review</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --surface: #141414;
+      --surface-elevated: #1a1a1a;
+      --surface-hover: #1e1e1e;
+      --border: rgba(255,255,255,0.06);
+      --border-light: rgba(255,255,255,0.1);
+      --text: #e8e6e3;
+      --text-dim: #8a8884;
+      --text-muted: #6b6965;
+      --accent: #7C5CFC;
+      --accent-dim: rgba(124,92,252,0.12);
+      --accent-glow: rgba(124,92,252,0.08);
+      --green: #22C55E;
+      --green-dim: rgba(34,197,94,0.12);
+      --amber: #F59E0B;
+      --amber-dim: rgba(245,158,11,0.12);
+      --radius: 10px;
+      --radius-sm: 6px;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --font-mono: 'Fira Code', 'JetBrains Mono', monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 48px 24px; }
+    
+    /* Hero */
+    .hero {
+      margin-bottom: 48px;
+      padding: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .hero h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .hero .subtitle {
+      font-size: 16px;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+    }
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .stat {
+      padding: 16px;
+      background: var(--surface-elevated);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+    .stat .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    .stat .label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    /* Section */
+    .section { margin-bottom: 40px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .section-header .num {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-dim);
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      font-family: var(--font-mono);
+    }
+    .section-header h2 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    /* File tree */
+    .file-tree {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 2;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      overflow-x: auto;
+    }
+    .file-tree .dir { color: var(--accent); }
+    .file-tree .file { color: var(--text-dim); }
+    .file-tree .file .status {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    .file-tree .file .status.ok { background: var(--green); }
+    .file-tree .indent { padding-left: 24px; }
+
+    /* Card grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      padding: 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .card:hover { border-color: var(--border-light); background: var(--surface-hover); }
+    .card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .card p {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    .card .count {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent);
+      background: var(--accent-dim);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+    }
+
+    /* Mermaid container */
+    .mermaid-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      color: var(--text-dim);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+    .badge.pass { background: var(--green-dim); color: var(--green); }
+    .badge.count { background: var(--accent-dim); color: var(--accent); }
+
+    /* Test result */
+    .test-list { 
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 2;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+    }
+    .test-list .pass { color: var(--green); }
+    .test-list .dim { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Hero -->
+    <div class="hero">
+      <h1>Phase 4 · Scaffold Complete</h1>
+      <div class="subtitle">Task 4.1 — Project scaffold, V2-DEEP design tokens, Vite config, TDD Button component, MSW test infrastructure</div>
+      <div class="hero-stats">
+        <div class="stat"><div class="value">26</div><div class="label">Files Created</div></div>
+        <div class="stat"><div class="value">5</div><div class="label">Tests Passing</div></div>
+        <div class="stat"><div class="value">16</div><div class="label">DDD Contexts</div></div>
+        <div class="stat"><div class="value">251</div><div class="label">Packages</div></div>
+      </div>
+    </div>
+
+    <!-- File Tree -->
+    <div class="section">
+      <div class="section-header">
+        <span class="num">01</span>
+        <h2>Project Structure</h2>
+      </div>
+      <div class="file-tree">
+        <span class="dir">contexter-web/</span><br>
+        <span class="indent"><span class="status ok"></span>package.json</span><br>
+        <span class="indent"><span class="status ok"></span>vite.config.ts</span><br>
+        <span class="indent"><span class="status ok"></span>tsconfig.json</span><br>
+        <span class="indent"><span class="status ok"></span>vitest.config.ts</span><br>
+        <span class="dir">src/</span><br>
+        <span class="indent"><span class="status ok"></span>main.tsx</span><br>
+        <span class="indent"><span class="status ok"></span>App.tsx</span><br>
+        <span class="indent"><span class="status ok"></span>routes.tsx</span><br>
+        <span class="indent"><span class="status ok"></span>styles/tokens.css</span><br>
+        <span class="indent"><span class="status ok"></span>api/client.ts</span><br>
+        <span class="indent"><span class="status ok"></span>api/hooks/</span><span class="dim"> (empty)</span><br>
+        <span class="indent"><span class="status ok"></span>components/ui/Button.tsx</span><br>
+        <span class="indent"><span class="status ok"></span>components/ui/Button.test.tsx</span><br>
+        <span class="indent"><span class="status ok"></span>components/layout/</span><span class="dim"> (empty)</span><br>
+        <span class="indent"><span class="status ok"></span>pages/Sessions/</span><span class="dim">, Memories/, Agents/, ...</span><br>
+        <span class="dir">tests/</span><br>
+        <span class="indent"><span class="status ok"></span>setup.ts</span><br>
+        <span class="indent"><span class="status ok"></span>mocks/server.ts</span><br>
+        <span class="indent"><span class="status ok"></span>mocks/handlers/</span><br>
+        <span class="indent"><span class="indent">sessions.ts, memories.ts, agents.ts, skills.ts, index.ts</span></span><br>
+        <span class="indent"><span class="status ok"></span>mocks/factories/</span>
+      </div>
+    </div>
+
+    <!-- DDD Bounded Contexts -->
+    <div class="section">
+      <div class="section-header">
+        <span class="num">02</span>
+        <h2>DDD Bounded Contexts</h2>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <h3>Session Context</h3>
+          <p>Session lifecycle, turns, timeline, message history</p>
+          <span class="count">2 pages</span>
+        </div>
+        <div class="card">
+          <h3>Knowledge Context</h3>
+          <p>Memory storage, semantic search, version history</p>
+          <span class="count">2 pages</span>
+        </div>
+        <div class="card">
+          <h3>Agent Context</h3>
+          <p>Agent registry, capabilities, performance</p>
+          <span class="count">2 pages</span>
+        </div>
+        <div class="card">
+          <h3>Skill Context</h3>
+          <p>Skill registry, effectiveness metrics</p>
+          <span class="count">2 pages</span>
+        </div>
+        <div class="card">
+          <h3>Observability Context</h3>
+          <p>Efficiency mapper + Analytics (2 sub-trees)</p>
+          <span class="count">15+ pages</span>
+        </div>
+        <div class="card">
+          <h3>Config Context</h3>
+          <p>Settings with 8 sections</p>
+          <span class="count">8 pages</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TDD Evidence -->
+    <div class="section">
+      <div class="section-header">
+        <span class="num">03</span>
+        <h2>TDD Evidence</h2>
+      </div>
+      <div class="test-list">
+        <span class="pass">✓</span> Button.test.tsx created <span class="dim">36 seconds before</span> Button.tsx<br>
+        <span class="pass">✓</span> RED phase: test failed (missing Button.tsx import)<br>
+        <span class="pass">✓</span> GREEN phase: all 5 tests pass<br>
+        <br>
+        <span class="pass">✓ renders the label text</span><br>
+        <span class="pass">✓ applies variant classes correctly</span><br>
+        <span class="pass">✓ fires onClick when clicked</span><br>
+        <span class="pass">✓ does not fire onClick when disabled</span><br>
+        <span class="pass">✓ shows loading spinner and disables button when loading</span><br>
+        <br>
+        <span class="dim">── Test Files  1 passed (1)</span><br>
+        <span class="dim">──      Tests  5 passed (5)</span>
+      </div>
+    </div>
+
+    <!-- Design Tokens -->
+    <div class="section">
+      <div class="section-header">
+        <span class="num">04</span>
+        <h2>V2-DEEP Design Tokens</h2>
+      </div>
+      <div class="card-grid">
+        <div class="card"><h3>--color-bg-primary</h3><p style="color:var(--text-muted)">#181716 — Base background</p></div>
+        <div class="card"><h3>--color-accent</h3><p style="color:#7C5CFC">#7C5CFC — Brand purple</p></div>
+        <div class="card"><h3>--color-text-primary</h3><p style="color:var(--text)">#F5F4F2 — Primary text</p></div>
+        <div class="card"><h3>--color-success</h3><p style="color:var(--green)">#22C55E — Success</p></div>
+        <div class="card"><h3>--color-warning</h3><p style="color:var(--amber)">#F59E0B — Warning</p></div>
+        <div class="card"><h3>--color-error</h3><p style="color:#EF4444">#EF4444 — Error</p></div>
+      </div>
+      <p style="margin-top:12px;font-size:13px;color:var(--text-dim)">28 color tokens + spacing (xs-2xl), radius (sm-xl), and font stacks defined in Tailwind v4 <code style="font-family:var(--font-mono);color:var(--accent)">@theme</code> block</p>
+    </div>
+
+  </div>
+</body>
+</html>
