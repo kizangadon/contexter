@@ -543,7 +543,7 @@ fn parse_uuid(s: &str, entity: &str) -> PyResult<Uuid> {
 // ---------------------------------------------------------------------------
 
 #[pymodule]
-fn contexter(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn contexter_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEngine>()?;
     Ok(())
 }
