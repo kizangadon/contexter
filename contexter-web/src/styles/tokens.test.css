@@ -1,0 +1,5 @@
+/* Verify that core design tokens are defined */
+:root {
+  --verify-bg: var(--color-bg-base, #181716);
+  --verify-accent: var(--color-accent, #7C5CFC);
+}

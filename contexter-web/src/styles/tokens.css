@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* ─── Contexter V2-DEEP Design Tokens ───────────────────────
+ * Dark-only palette. No light mode.
+ * Dark mode via @media (prefers-color-scheme: dark) is the
+ * default — we only support dark, so no media query needed.
+ */
+
+@theme {
+  /* ── Backgrounds ───────────────────────────────────────── */
+  --color-bg-primary: #181716;
+  --color-bg-secondary: #1e1d1c;
+  --color-bg-tertiary: #242322;
+  --color-bg-hover: #2a2928;
+  --color-bg-active: #302f2e;
+
+  /* ── Surfaces ──────────────────────────────────────────── */
+  --color-surface: #1e1d1c;
+  --color-surface-hover: #242322;
+  --color-surface-active: #2a2928;
+
+  /* ── Borders ───────────────────────────────────────────── */
+  --color-border: #2e2d2c;
+  --color-border-hover: #3a3938;
+  --color-border-active: #444342;
+
+  /* ── Accent ────────────────────────────────────────────── */
+  --color-accent: #7c5cfc;
+  --color-accent-hover: #6b4fe0;
+  --color-accent-muted: rgba(124, 92, 252, 0.15);
+  --color-accent-subtle: rgba(124, 92, 252, 0.08);
+
+  /* ── Text ──────────────────────────────────────────────── */
+  --color-text-primary: #f5f4f2;
+  --color-text-secondary: #a09e9c;
+  --color-text-tertiary: #73716e;
+  --color-text-inverse: #181716;
+
+  /* ── Semantic ──────────────────────────────────────────── */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+  --color-pending: #a09e9c;
+  --color-offline: #6b7280;
+
+  /* ── Spacing ───────────────────────────────────────────── */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* ── Border Radius ─────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ── Typography ────────────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Base Layer ──────────────────────────────────────────── */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-border);
+  }
+}
