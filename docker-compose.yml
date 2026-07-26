@@ -1,0 +1,41 @@
+services:
+  # ──────────────────────────────────────────────────────────
+  # API: FastAPI server backed by the Rust contexter-core engine
+  # ──────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "8051:8051"      # REST API (uvicorn)
+      # MCP SSE server runs on 8052 inside the container (no host mapping needed)
+    volumes:
+      - contexter-data:/root/.contexter
+    environment:
+      - CONtexTER_ENABLE_DOCS=true
+      - CONtexTER_RATE_LIMIT_ENABLED=true
+      - CONtexTER_RATE_LIMIT=100/minute
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8051/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────
+  # Web: React SPA served by nginx (production build)
+  # ──────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    ports:
+      - "8080:80"        # Host port 8080 → container nginx port 80
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  contexter-data:
