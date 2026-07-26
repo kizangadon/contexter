@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contexter Frontend Scaffold — Implementation Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #181716;
+      --surface: #1e1d1c;
+      --surface-hover: #242322;
+      --border: #2e2d2c;
+      --text: #f5f4f2;
+      --text-dim: #a09e9c;
+      --text-muted: #73716e;
+      --accent: #7c5cfc;
+      --accent-dim: rgba(124, 92, 252, 0.15);
+      --accent-subtle: rgba(124, 92, 252, 0.08);
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --radius: 8px;
+      --radius-lg: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+
+    header {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      background: var(--accent-dim);
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: var(--text-dim);
+      font-size: 16px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .stat-card .label {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .stat-card.pass .value { color: var(--success); }
+    .stat-card.total .value { color: var(--text); }
+
+    section {
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .file-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .file-card:hover {
+      border-color: var(--accent);
+      background: var(--surface-hover);
+    }
+
+    .file-card .path {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      color: var(--accent);
+      word-break: break-all;
+    }
+
+    .file-card .desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .config-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .config-table th {
+      text-align: left;
+      padding: 10px 12px;
+      background: var(--surface);
+      border-bottom: 2px solid var(--border);
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .config-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .config-table td.value { color: var(--accent); }
+
+    .test-list {
+      list-style: none;
+    }
+
+    .test-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+    }
+
+    .test-list li .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .test-list li .dot.pass { background: var(--success); }
+    .test-list li .name { font-size: 14px; }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 640px) { .report-grid { grid-template-columns: 1fr; } }
+
+    .report-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .report-item h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .report-item .check {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+    }
+
+    .report-item .check.pass { color: var(--success); }
+    .report-item .check.fail { color: var(--error); }
+    .report-item .detail { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+
+    .mock-handlers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .mock-tag {
+      padding: 4px 12px;
+      background: var(--accent-subtle);
+      border: 1px solid var(--accent-dim);
+      border-radius: 100px;
+      font-size: 13px;
+      color: var(--accent);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">Task 4.1 · Complete</div>
+      <h1>Contexter Frontend Scaffold</h1>
+      <p class="subtitle">React 19 · TypeScript 6 · Vite 8 · Tailwind v4 · Vitest · MSW v2</p>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card total">
+        <div class="value">26</div>
+        <div class="label">Files Created</div>
+      </div>
+      <div class="stat-card pass">
+        <div class="value">5/5</div>
+        <div class="label">Tests Passing</div>
+      </div>
+      <div class="stat-card pass">
+        <div class="value">✓</div>
+        <div class="label">Build Passes</div>
+      </div>
+      <div class="stat-card pass">
+        <div class="value">5173</div>
+        <div class="label">Dev Server Port</div>
+      </div>
+    </div>
+
+    <!-- Config -->
+    <section>
+      <h2>⚙ Configuration</h2>
+      <table class="config-table">
+        <thead>
+          <tr><th>Setting</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Vite server.port</td><td class="value">5173</td></tr>
+          <tr><td>Vite proxy /api</td><td class="value">→ http://localhost:8051</td></tr>
+          <tr><td>Path alias</td><td class="value">@/ → src/</td></tr>
+          <tr><td>TypeScript strict</td><td class="value">true</td></tr>
+          <tr><td>noUncheckedIndexedAccess</td><td class="value">true</td></tr>
+          <tr><td>Vitest environment</td><td class="value">jsdom</td></tr>
+          <tr><td>Coverage threshold</td><td class="value">80% (branches, functions, lines, statements)</td></tr>
+          <tr><td>MSW</td><td class="value">v2, node server, per-domain handlers</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Source Files -->
+    <section>
+      <h2>📁 Source Files</h2>
+      <div class="file-grid">
+        <div class="file-card">
+          <div class="path">src/main.tsx</div>
+          <div class="desc">Entry point with StrictMode</div>
+        </div>
+        <div class="file-card">
+          <div class="path">src/App.tsx</div>
+          <div class="desc">App shell placeholder</div>
+        </div>
+        <div class="file-card">
+          <div class="path">src/routes.tsx</div>
+          <div class="desc">Route config (React Router v7)</div>
+        </div>
+        <div class="file-card">
+          <div class="path">src/styles/tokens.css</div>
+          <div class="desc">V2-DEEP design tokens (28 color props, spacing, radius, fonts)</div>
+        </div>
+        <div class="file-card">
+          <div class="path">src/api/client.ts</div>
+          <div class="desc">Typed fetch wrapper (GET/POST/PATCH/DELETE)</div>
+        </div>
+        <div class="file-card">
+          <div class="path">src/components/ui/Button.tsx</div>
+          <div class="desc">Button component (primary/secondary/ghost + loading state)</div>
+        </div>
+        <div class="file-card">
+          <div class="path">src/components/ui/Button.test.tsx</div>
+          <div class="desc">TDD — written before Button.tsx, 5 test cases</div>
+        </div>
+        <div class="file-card">
+          <div class="path">tests/setup.ts</div>
+          <div class="desc">Vitest + MSW setup (jest-dom matchers)</div>
+        </div>
+        <div class="file-card">
+          <div class="path">tests/mocks/server.ts</div>
+          <div class="desc">MSW node server</div>
+        </div>
+        <div class="file-card">
+          <div class="path">tests/mocks/handlers/{sessions,memories,agents,skills}.ts</div>
+          <div class="desc">Per-domain handler arrays</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bounded Contexts -->
+    <section>
+      <h2>📂 Bounded Contexts (DDD)</h2>
+      <p style="color:var(--text-dim);margin-bottom:16px;">Ubiquitous language: Session, Memory, Agent, Skill</p>
+      <div class="mock-handlers">
+        <span class="mock-tag">Sessions</span>
+        <span class="mock-tag">Memories</span>
+        <span class="mock-tag">Agents</span>
+        <span class="mock-tag">Skills</span>
+        <span class="mock-tag">Efficiency</span>
+        <span class="mock-tag">Analytics</span>
+        <span class="mock-tag">Settings</span>
+        <span class="mock-tag">Notifications</span>
+        <span class="mock-tag">Feedback</span>
+        <span class="mock-tag">Exports</span>
+        <span class="mock-tag">Onboarding</span>
+        <span class="mock-tag">Playground</span>
+        <span class="mock-tag">Search</span>
+        <span class="mock-tag">Correlation</span>
+        <span class="mock-tag">Audit</span>
+        <span class="mock-tag">Dashboard</span>
+      </div>
+    </section>
+
+    <!-- Test Results -->
+    <section>
+      <h2>✅ Button Component — Test Results</h2>
+      <ul class="test-list">
+        <li><span class="dot pass"></span><span class="name">renders the label text</span></li>
+        <li><span class="dot pass"></span><span class="name">applies variant classes correctly</span></li>
+        <li><span class="dot pass"></span><span class="name">fires onClick when clicked</span></li>
+        <li><span class="dot pass"></span><span class="name">does not fire onClick when disabled</span></li>
+        <li><span class="dot pass"></span><span class="name">shows a loading spinner and disables the button when loading</span></li>
+      </ul>
+    </section>
+
+    <!-- Acceptance Criteria -->
+    <section>
+      <h2>📋 Acceptance Criteria</h2>
+      <div class="report-grid">
+        <div class="report-item">
+          <h3>AC-001: Project scaffold</h3>
+          <div class="check pass">✓ PASS</div>
+          <div class="detail">npm run dev → port 5173 · npm run build → exit 0</div>
+        </div>
+        <div class="report-item">
+          <h3>AC-002: Design tokens</h3>
+          <div class="check pass">✓ PASS</div>
+          <div class="detail">28 token properties in tokens.css, @theme block</div>
+        </div>
+        <div class="report-item">
+          <h3>AC-003: Button renders all states</h3>
+          <div class="check pass">✓ PASS</div>
+          <div class="detail">5/5 tests pass</div>
+        </div>
+        <div class="report-item">
+          <h3>TDD verification</h3>
+          <div class="check pass">✓ PASS</div>
+          <div class="detail">Button.test.tsx created before Button.tsx</div>
+        </div>
+        <div class="report-item">
+          <h3>Setup verification</h3>
+          <div class="check pass">✓ PASS</div>
+          <div class="detail">vitest run — all tests green</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TDD Evidence -->
+    <section>
+      <h2>⏱ TDD Evidence</h2>
+      <table class="config-table">
+        <thead>
+          <tr><th>File</th><th>Created</th><th>Order</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Button.test.tsx</td><td class="value">00:56:31</td><td style="color:var(--success)">1st (test first)</td></tr>
+          <tr><td>Button.tsx</td><td class="value">00:57:07</td><td style="color:var(--accent)">2nd (implementation)</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</body>
+</html>
