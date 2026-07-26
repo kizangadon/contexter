@@ -1,0 +1,34 @@
+# Version control
+.git
+.gitignore
+
+# Node
+**/node_modules
+
+# Python
+**/__pycache__
+**/.venv
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.oxlint_cache
+**/*.pyc
+**/*.egg-info
+
+# Rust
+**/target
+
+# Build output
+**/dist
+**/.vite
+
+# Environment
+**/.env
+**/.env.local
+**/.env.*.local
+
+# IDE
+**/.idea
+**/.vscode
+**/*.swp
+**/*.swo

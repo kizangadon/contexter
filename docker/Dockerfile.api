@@ -1,0 +1,65 @@
+# ============================================================
+# Stage 1: Build the contexter-core Python wheel via maturin
+# ============================================================
+FROM python:3.12-slim AS builder
+
+# Install Rust toolchain + C++ compiler
+# rocksdb and duckdb (bundled) compile from C++ source at build time
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gcc \
+    g++ \
+    cmake \
+    make \
+    pkg-config \
+    libclang-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust via rustup
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /build
+
+# Copy only the core source for wheel building
+COPY contexter-core/ .
+
+# Build the Python wheel
+RUN pip install --no-cache-dir maturin && \
+    maturin build --release --out dist
+
+# ============================================================
+# Stage 2: Runtime image — Python FastAPI server
+# ============================================================
+FROM python:3.12-slim
+
+# Install curl for Docker healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the pre-built wheel from builder stage
+COPY --from=builder /build/dist/*.whl /tmp/
+
+# Install the contexter-core wheel
+RUN pip install --no-cache-dir /tmp/*.whl && \
+    rm /tmp/*.whl
+
+# Install the contexter-server package
+COPY contexter-server/ .
+RUN pip install --no-cache-dir .
+
+# Verify core module is importable
+RUN python -c "from contexter_core import Engine; print(f'contexter_core: OK ({Engine.__module__})')"
+
+EXPOSE 8051 8052
+
+# Dev-friendly defaults: no API key, docs enabled, rate limiting on
+ENV CONtexTER_ENABLE_DOCS=true
+ENV CONtexTER_RATE_LIMIT_ENABLED=true
+ENV CONtexTER_RATE_LIMIT=100/minute
+
+CMD ["uvicorn", "contexter_server.main:app", "--host", "0.0.0.0", "--port", "8051"]
