@@ -75,6 +75,11 @@ class StorageEngine:
     """
 
     def __init__(self, path: str, max_workers: int | None = None) -> None:
+        # Expand leading ~/ to the user's home directory — the Rust Engine
+        # does not perform tilde expansion, so ``"~/.contexter/"`` must be
+        # resolved before it reaches RocksDB.
+        expanded_path = os.path.expanduser(path)
+
         if max_workers is None:
             env_val = os.environ.get("CONtexTER_BRIDGE_POOL_SIZE", "")
             if env_val.strip():
@@ -88,7 +93,7 @@ class StorageEngine:
             max_workers = 8
         self._max_workers = max_workers
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
-        self._engine = _SyncEngine.open(path)
+        self._engine = _SyncEngine.open(expanded_path)
 
     # ------------------------------------------------------------------
     # Internal dispatch

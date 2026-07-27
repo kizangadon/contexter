@@ -56,7 +56,7 @@ class MemoryService:
                 id=r.get("id", ""),
                 type="memory",
                 score=r.get("score", 0.0),
-                data=r,
+                data={k: v for k, v in r.items() if k != "embedding"},
                 snippet=r.get("content", "")[:200] if r.get("content") else None,
             )
             for r in memory_results

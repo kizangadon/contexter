@@ -1,7 +1,7 @@
 """Tests for memory Pydantic models."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from pydantic import ValidationError
@@ -34,6 +34,15 @@ class TestMemoryModel:
         assert mem.agent_id == agent_id
         assert mem.role == "assistant"
         assert mem.content == "Hi!"
+
+    def test_role_default_is_system(self):
+        """Memory role should default to 'system' when not specified."""
+        mem = Memory(
+            session_id=uuid.uuid4(),
+            agent_id=uuid.uuid4(),
+            content="Default role test",
+        )
+        assert mem.role == "system"
 
     def test_memory_with_all_fields(self):
         """Memory with all fields."""
@@ -76,6 +85,61 @@ class TestMemoryModel:
         json_str = mem.model_dump_json()
         restored = Memory.model_validate_json(json_str)
         assert restored.content == "Hello world"
+
+    def test_agent_id_optional_none(self):
+        """Memory with no agent_id defaults to None."""
+        mem = Memory(
+            session_id=uuid.uuid4(),
+            content="test memory without agent_id",
+        )
+        assert mem.agent_id is None
+
+    def test_role_explicit_none(self):
+        """Memory with explicit role=None should be None, not 'system'."""
+        mem = Memory(
+            session_id=uuid.uuid4(),
+            agent_id=uuid.uuid4(),
+            content="explicit null role",
+            role=None,
+        )
+        assert mem.role is None
+
+    def test_embedding_excluded_from_serialization(self):
+        """model_dump and model_dump_json should not include embedding."""
+        mem = Memory(
+            session_id=uuid.uuid4(),
+            agent_id=uuid.uuid4(),
+            content="test",
+            embedding=[0.1, 0.2, 0.3],
+        )
+        data = mem.model_dump()
+        assert 'embedding' not in data
+        json_str = mem.model_dump_json()
+        assert 'embedding' not in json_str
+
+    def test_naive_datetime_coerced_to_utc(self):
+        """A naive datetime should be coerced to UTC-aware."""
+        mem = Memory(
+            session_id=uuid.uuid4(),
+            agent_id=uuid.uuid4(),
+            content="test",
+            created_at=datetime(2024, 1, 1, 12, 0, 0),  # naive
+        )
+        assert mem.created_at.tzinfo is not None
+        assert mem.created_at.tzinfo.utcoffset(mem.created_at) == timezone.utc.utcoffset(datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
+
+    def test_camelcase_alias_deserialization(self):
+        """Memory should accept camelCase JSON fields via validation_alias."""
+        json_data = (
+            '{"id": "00000000-0000-0000-0000-000000000001", '
+            '"sessionId": "00000000-0000-0000-0000-000000000002", '
+            '"agentId": "00000000-0000-0000-0000-000000000003", '
+            '"content": "alias test"}'
+        )
+        mem = Memory.model_validate_json(json_data)
+        assert mem.session_id == uuid.UUID("00000000-0000-0000-0000-000000000002")
+        assert mem.agent_id == uuid.UUID("00000000-0000-0000-0000-000000000003")
+        assert mem.content == "alias test"
 
 
 class TestMemoryCreateModel:
