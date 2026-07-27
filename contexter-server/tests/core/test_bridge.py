@@ -115,6 +115,16 @@ class TestStorageEngineInit:
         finally:
             del os.environ["CONtexTER_BRIDGE_POOL_SIZE"]
 
+    def test_os_expanduser_called(self):
+        """os.path.expanduser should be called when a tilde path is provided."""
+        with patch("contexter_server.core.bridge.os.path.expanduser") as mock_expand:
+            mock_expand.return_value = "/home/user/.contexter"
+            with patch("contexter_server.core.bridge._SyncEngine") as mock_engine:
+                mock_engine.open.return_value = MagicMock()
+                StorageEngine(path="~/.contexter")
+                mock_expand.assert_called_once_with("~/.contexter")
+                mock_engine.open.assert_called_once_with("/home/user/.contexter")
+
 
 class TestStorageEngineSession:
     """Session CRUD tests."""

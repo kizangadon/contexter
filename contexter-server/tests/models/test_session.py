@@ -91,6 +91,16 @@ class TestSessionModel:
         assert restored.id == session.id
         assert restored.project == "test"
 
+    def test_session_agent_id_optional(self):
+        """Session with no agent_id should default to None."""
+        session = Session(project="test-project")
+        assert session.agent_id is None
+
+    def test_status_done_normalized(self):
+        """Session status 'done' should be normalized to 'completed'."""
+        session = Session(agent_id=uuid.uuid4(), project="test", status="done")
+        assert session.status == "completed"
+
 
 class TestSessionCreateModel:
     """SessionCreate validation tests."""
