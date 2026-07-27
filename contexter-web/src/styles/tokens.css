@@ -2,73 +2,222 @@
 
 /* ─── Contexter V2-DEEP Design Tokens ───────────────────────
  * Dark-only palette. No light mode.
- * Dark mode via @media (prefers-color-scheme: dark) is the
- * default — we only support dark, so no media query needed.
+ * Refer to docs/contracts/V2-DEEP-design-system.md for the full spec.
+ *
+ * Strategy:
+ *   @theme → Tailwind-namespaced tokens for utility generation
+ *   :root  → Flat V2-DEEP aliases for direct var() use
+ *            (shadows, gradients, chart, motion, layout live here)
  */
 
 @theme {
   /* ── Backgrounds ───────────────────────────────────────── */
-  --color-bg-primary: #181716;
-  --color-bg-secondary: #1e1d1c;
-  --color-bg-tertiary: #242322;
-  --color-bg-hover: #2a2928;
-  --color-bg-active: #302f2e;
-
-  /* ── Surfaces ──────────────────────────────────────────── */
-  --color-surface: #1e1d1c;
-  --color-surface-hover: #242322;
-  --color-surface-active: #2a2928;
-
-  /* ── Borders ───────────────────────────────────────────── */
-  --color-border: #2e2d2c;
-  --color-border-hover: #3a3938;
-  --color-border-active: #444342;
+  --color-bg-base: #181716;
+  --color-bg-elevated: #1F1E1D;
+  --color-bg-hover: #252423;
+  --color-bg-active: #2A2928;
+  --color-bg-inset: #131211;
 
   /* ── Accent ────────────────────────────────────────────── */
-  --color-accent: #7c5cfc;
-  --color-accent-hover: #6b4fe0;
-  --color-accent-muted: rgba(124, 92, 252, 0.15);
-  --color-accent-subtle: rgba(124, 92, 252, 0.08);
+  --color-accent: #7C5CFC;
+  --color-accent-hover: #6A4DE0;
+  --color-accent-muted: #7C5CFC20;
 
   /* ── Text ──────────────────────────────────────────────── */
-  --color-text-primary: #f5f4f2;
-  --color-text-secondary: #a09e9c;
-  --color-text-tertiary: #73716e;
+  --color-text-primary: #F2F0EE;
+  --color-text-secondary: #A09E9B;
+  --color-text-tertiary: #6F6D6B;
   --color-text-inverse: #181716;
+  --color-text-link: #7C5CFC;
+  --color-text-link-hover: #9B82FF;
 
-  /* ── Semantic ──────────────────────────────────────────── */
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-info: #3b82f6;
-  --color-pending: #a09e9c;
-  --color-offline: #6b7280;
+  /* ── Borders ───────────────────────────────────────────── */
+  --color-border-subtle: #2A2928;
+  --color-border-default: #343231;
+  --color-border-accent: #7C5CFC;
+
+  /* ── Status ────────────────────────────────────────────── */
+  --color-status-success: #4CAF50;
+  --color-status-warning: #FF9800;
+  --color-status-error: #F44336;
+  --color-status-info: #42A5F5;
+  --color-status-pending: #FFA726;
+  --color-status-offline: #6F6D6B;
+
+  /* ── Status BGs ───────────────────────────────────────── */
+  --color-bg-status-success: #4CAF5020;
+  --color-bg-status-warning: #FF980020;
+  --color-bg-status-error: #F4433620;
+  --color-bg-status-info: #42A5F520;
+
+  /* ── Surface Cards ─────────────────────────────────────── */
+  --color-surface-card: #1F1E1D;
+  --color-surface-card-alt: #222120;
+  --color-surface-card-hover: #252423;
+  --color-surface-card-accent: #1F1D24;
 
   /* ── Spacing ───────────────────────────────────────────── */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-2xl: 48px;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
 
   /* ── Border Radius ─────────────────────────────────────── */
-  --radius-sm: 6px;
+  --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-full: 9999px;
 
-  /* ── Typography ────────────────────────────────────────── */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  /* ── Font Families ─────────────────────────────────────── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-display: 'Inter', sans-serif;
+
+  /* ── Type Scale (Tailwind v4 syntax) ───────────────────── */
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-xs--font-weight: 500;
+
+  --text-sm: 12px;
+  --text-sm--line-height: 18px;
+  --text-sm--font-weight: 500;
+
+  --text-base: 14px;
+  --text-base--line-height: 22px;
+  --text-base--font-weight: 450;
+
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  --text-lg--font-weight: 500;
+
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-xl--font-weight: 600;
+
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
+  --text-2xl--font-weight: 600;
+
+  --text-3xl: 32px;
+  --text-3xl--line-height: 40px;
+  --text-3xl--font-weight: 650;
+}
+
+/* ── Flat V2-DEEP Aliases ───────────────────────────────────
+ * These allow direct var() usage in component code.
+ * Each references its @theme counterpart.
+ */
+:root {
+  /* ── Backgrounds ─────────────────────────────────── */
+  --bg-base: var(--color-bg-base);
+  --bg-elevated: var(--color-bg-elevated);
+  --bg-hover: var(--color-bg-hover);
+  --bg-active: var(--color-bg-active);
+  --bg-inset: var(--color-bg-inset);
+
+  /* ── Accent ──────────────────────────────────────── */
+  --accent: var(--color-accent);
+  --accent-hover: var(--color-accent-hover);
+  --accent-muted: var(--color-accent-muted);
+  --accent-glow: #7C5CFC40;
+
+  /* ── Text ────────────────────────────────────────── */
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary: var(--color-text-tertiary);
+  --text-inverse: var(--color-text-inverse);
+  --text-link: var(--color-text-link);
+  --text-link-hover: var(--color-text-link-hover);
+
+  /* ── Borders ─────────────────────────────────────── */
+  --border-subtle: var(--color-border-subtle);
+  --border-default: var(--color-border-default);
+  --border-accent: var(--color-border-accent);
+
+  /* ── Status ──────────────────────────────────────── */
+  --status-success: var(--color-status-success);
+  --status-warning: var(--color-status-warning);
+  --status-error: var(--color-status-error);
+  --status-info: var(--color-status-info);
+  --status-pending: var(--color-status-pending);
+  --status-offline: var(--color-status-offline);
+
+  /* ── Status BGs ──────────────────────────────────── */
+  --bg-status-success: var(--color-bg-status-success);
+  --bg-status-warning: var(--color-bg-status-warning);
+  --bg-status-error: var(--color-bg-status-error);
+  --bg-status-info: var(--color-bg-status-info);
+
+  /* ── Surface Cards ──────────────────────────────── */
+  --surface-card: var(--color-surface-card);
+  --surface-card-alt: var(--color-surface-card-alt);
+  --surface-card-hover: var(--color-surface-card-hover);
+  --surface-card-accent: var(--color-surface-card-accent);
+
+  /* ── Shadows ─────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.5);
+  --shadow-accent: 0 0 20px #7C5CFC30;
+
+  /* ── Gradients ───────────────────────────────────── */
+  --gradient-card: linear-gradient(135deg, #1F1E1D 0%, #1D1C1B 100%);
+  --gradient-accent: linear-gradient(135deg, #7C5CFC 0%, #6344E0 100%);
+  --gradient-accent-glow: radial-gradient(ellipse at center, #7C5CFC20 0%, transparent 70%);
+
+  /* ── Chart Colors ────────────────────────────────── */
+  --chart-1: #7C5CFC;
+  --chart-2: #4FC3F7;
+  --chart-3: #66BB6A;
+  --chart-4: #FFA726;
+  --chart-5: #EF5350;
+  --chart-6: #AB47BC;
+  --chart-7: #26C6DA;
+  --chart-8: #8D6E63;
+  --chart-grid: #2A2928;
+  --chart-axis: #6F6D6B;
+  --chart-zero: #343231;
+
+  /* ── Motion ──────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+
+  /* ── Layout ──────────────────────────────────────── */
+  --max-content-width: 1440px;
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 60px;
+  --topbar-height: 56px;
+
+  /* === Backward-compatible aliases === */
+  --color-border: var(--color-border-default);
+  --color-surface: var(--color-surface-card);
+  --color-success: var(--color-status-success);
+  --color-error: var(--color-status-error);
+  --color-warning: var(--color-status-warning);
+  --color-info: var(--color-status-info);
+  --color-pending: var(--color-status-pending);
+  --color-offline: var(--color-status-offline);
+  --color-bg-primary: var(--color-bg-base);
+  --color-bg-secondary: var(--color-bg-elevated);
+  --color-bg-tertiary: var(--color-bg-hover);
 }
 
 /* ── Base Layer ──────────────────────────────────────────── */
 @layer base {
   html {
     font-family: var(--font-sans);
-    background-color: var(--color-bg-primary);
-    color: var(--color-text-primary);
+    background-color: var(--bg-base);
+    color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -81,6 +230,6 @@
   *,
   *::before,
   *::after {
-    border-color: var(--color-border);
+    border-color: var(--border-default);
   }
 }
