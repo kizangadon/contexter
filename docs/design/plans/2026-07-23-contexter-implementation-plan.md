@@ -22,7 +22,7 @@
 
 **Key deliverables:**
 - `contexter-core/` — Rust crate with module tree, `StorageBackend` trait, RocksDB implementation (8 column families), `Engine` struct composing all tiers, `#[pyclass]` bridge
-- `core_bridge.py` — Python async wrapper with `asyncio.to_thread()` + `ThreadPoolExecutor`
+- `core_bridge.py` — Python async wrapper dispatching engine calls via `loop.run_in_executor()` on a bounded, configurable `ThreadPoolExecutor` (default 8 workers, `CONTEXTER_BRIDGE_POOL_SIZE`)
 - `cli/main.py` — Click CLI for diagnostics (session CRUD, memory CRUD, status)
 - Test suite: inline `#[cfg(test)]` per source file + integration tests in `tests/`
 

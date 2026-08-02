@@ -1,4 +1,4 @@
-"""Tests for MCP handler fixes — type_filter rename, UUID error handling."""
+"""Tests for MCP handler fixes — type parameter, UUID error handling."""
 
 from unittest.mock import AsyncMock
 from uuid import UUID
@@ -23,29 +23,29 @@ def mock_services():
     }
 
 
-class TestTypeFilterRename:
-    """Verify type parameter renamed to type_filter to avoid shadowing built-in type()."""
+class TestTypeParameter:
+    """Verify list_skills/search_memories accept the ``type`` parameter (SPEC AC-003)."""
 
     @pytest.mark.asyncio
-    async def test_search_memories_accepts_type_filter(self, mock_services):
-        """handle_search_memories should use type_filter parameter."""
+    async def test_search_memories_accepts_type(self, mock_services):
+        """handle_search_memories should use the type parameter."""
         mock_services["memory_service"].search.return_value = SearchResponse()
 
         result = await handle_search_memories(
             query="test",
-            type_filter="user",
+            type="user",
             memory_service=mock_services["memory_service"],
         )
 
         assert "error" not in result
 
     @pytest.mark.asyncio
-    async def test_list_skills_accepts_type_filter(self, mock_services):
-        """handle_list_skills should use type_filter parameter."""
+    async def test_list_skills_accepts_type(self, mock_services):
+        """handle_list_skills should use the type parameter."""
         mock_services["skill_service"].list.return_value = []
 
         result = await handle_list_skills(
-            type_filter="memory",
+            type="memory",
             skill_service=mock_services["skill_service"],
         )
 
@@ -55,24 +55,26 @@ class TestTypeFilterRename:
 
 
 class TestUUIDErrorHandling:
-    """Verify ValueError from UUID(...) parsing is caught and returned as descriptive error."""
+    """Verify ValueError from UUID(...) parsing becomes a structured error."""
 
     @pytest.mark.asyncio
     async def test_store_memory_handles_invalid_uuid(self, mock_services):
-        """Invalid session_id UUID should return error dict, not propagate 500."""
+        """Invalid session_id UUID raises HandlerError, never a 500 or error dict."""
+        from contexter_server.mcp_tools.errors import HandlerError
+
         mock_services["session_service"].get.return_value = Session(
             id=UUID("00000000-0000-0000-0000-000000000001"),
             agent_id=UUID("00000000-0000-0000-0000-000000000001"),
             project="test",
         )
 
-        result = await handle_store_memory(
-            session_id="not-a-uuid",
-            role="user",
-            content="test",
-            memory_service=mock_services["memory_service"],
-            session_service=mock_services["session_service"],
-        )
+        with pytest.raises(HandlerError) as exc:
+            await handle_store_memory(
+                session_id="not-a-uuid",
+                role="user",
+                content="test",
+                memory_service=mock_services["memory_service"],
+                session_service=mock_services["session_service"],
+            )
 
-        assert "error" in result
-        assert "invalid" in result["error"].lower() or "uuid" in result["error"].lower()
+        assert "invalid" in str(exc.value).lower() or "uuid" in str(exc.value).lower()

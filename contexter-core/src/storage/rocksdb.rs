@@ -39,6 +39,11 @@ pub struct RocksDbBackend {
     db: DB,
     cfs: ColumnFamilyMap,
     config: RocksDbConfig,
+    // Test-only seam (count-fallback-test): when set, `estimated_session_count`
+    // reports the estimate as unavailable so `count_sessions` exercises the
+    // exact full-scan fallback. Absent from production builds.
+    #[cfg(test)]
+    force_session_count_fallback: bool,
 }
 
 impl RocksDbBackend {
@@ -193,6 +198,8 @@ impl RocksDbBackend {
             db,
             cfs: ColumnFamilyMap::new(),
             config,
+            #[cfg(test)]
+            force_session_count_fallback: false,
         })
     }
 
@@ -208,6 +215,26 @@ impl RocksDbBackend {
         self.db
             .cf_handle(name)
             .ok_or_else(|| EngineError::Storage(format!("column family '{name}' not found")))
+    }
+
+    /// Best-effort O(1) estimate of session rows read from the
+    /// `rocksdb.estimate-num-keys` column-family property.
+    ///
+    /// Returns `Ok(None)` when the property is unavailable or unparseable —
+    /// callers must fall back to an exact full scan (see `count_sessions`).
+    fn estimated_session_count(&self) -> EngineResult<Option<u64>> {
+        // Test-only seam (count-fallback-test): make the property appear
+        // unavailable so tests exercise the exact full-scan fallback.
+        #[cfg(test)]
+        if self.force_session_count_fallback {
+            return Ok(None);
+        }
+        Ok(self
+            .db
+            .property_value_cf(self.cf(self.cfs.sessions)?, "rocksdb.estimate-num-keys")
+            .ok()
+            .flatten()
+            .and_then(|v| v.parse::<u64>().ok()))
     }
 
     fn session_key(id: &Uuid) -> String {
@@ -712,6 +739,19 @@ impl StorageBackend for RocksDbBackend {
             return Ok(count);
         }
 
+        // When no filters are set, use the RocksDB estimate-num-keys property
+        // for a fast O(1) count instead of a full scan (mirrors count_agents
+        // and count_skills). The sessions CF holds only session keys — index
+        // entries live in the companion session_index CF — so the estimate is
+        // valid ONLY under this invariant; if it breaks, unfiltered counts
+        // must not use the estimate.
+        if filter.agent_id.is_none() && filter.status.is_none() {
+            if let Some(count) = self.estimated_session_count()? {
+                return Ok(count);
+            }
+            // Fall through to full scan if the property is unavailable.
+        }
+
         // Unfiltered / agent-only / status-only: full scan with in-memory filter.
         let cf = self.cf(self.cfs.sessions)?;
         let mut count = 0u64;
@@ -988,7 +1028,10 @@ impl StorageBackend for RocksDbBackend {
 
     fn count_memories(&self, filter: &MemoryFilter) -> EngineResult<u64> {
         // When no filters are set, use the RocksDB estimate-num-keys property
-        // for a fast O(1) count instead of a full scan (REQ-S-004).
+        // for a fast O(1) count instead of a full scan (REQ-S-004). The
+        // memory_items CF holds only memory keys — index entries live in the
+        // companion memory_index CF — so the estimate is valid ONLY under this
+        // invariant; if it breaks, unfiltered counts must not use the estimate.
         if filter.session_id.is_none()
             && filter.agent_id.is_none()
             && filter.memory_type.is_none()
@@ -1152,6 +1195,67 @@ impl StorageBackend for RocksDbBackend {
         Ok(results.into_iter().skip(offset).take(limit).collect())
     }
 
+    fn count_agents(&self, filter: &AgentFilter) -> EngineResult<u64> {
+        // When no filters are set, use the RocksDB estimate-num-keys property
+        // for a fast O(1) count instead of a full scan (mirrors count_memories).
+        // The agents CF holds only agent keys (no separate index CF), so the
+        // estimate is valid ONLY under this invariant; if the CF ever holds
+        // non-agent keys, unfiltered counts must not use the estimate.
+        if filter.name.is_none() && filter.status.is_none() && filter.capability.is_none() {
+            if let Some(val) = self
+                .db
+                .property_value_cf(self.cf(self.cfs.agents)?, "rocksdb.estimate-num-keys")
+                .ok()
+                .flatten()
+            {
+                if let Ok(count) = val.parse::<u64>() {
+                    return Ok(count);
+                }
+            }
+            // Fall through to full scan if the property is unavailable.
+        }
+
+        // Filtered counts have no secondary index — full scan with
+        // in-memory filtering (same semantics as list_agents).
+        let mut count = 0u64;
+        let iter = self
+            .db
+            .iterator_cf(self.cf(self.cfs.agents)?, IteratorMode::Start);
+
+        for item in iter {
+            let (key, value) = item?;
+            if !key.starts_with(KEY_PREFIX_AGENT.as_bytes()) {
+                continue;
+            }
+
+            let agent: Agent = serde_json::from_slice(&value)?;
+
+            if let Some(ref name) = filter.name {
+                if !agent.name.to_lowercase().contains(&name.to_lowercase()) {
+                    continue;
+                }
+            }
+            if let Some(ref status) = filter.status {
+                if agent.status != *status {
+                    continue;
+                }
+            }
+            if let Some(ref capability) = filter.capability {
+                if !agent
+                    .capabilities
+                    .iter()
+                    .any(|c| c.eq_ignore_ascii_case(capability))
+                {
+                    continue;
+                }
+            }
+
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
     fn update_agent(&self, id: Uuid, patch: &AgentPatch) -> EngineResult<Agent> {
         let key = Self::agent_key(&id);
         let existing = self
@@ -1271,6 +1375,58 @@ impl StorageBackend for RocksDbBackend {
         let offset = filter.offset as usize;
         let limit = filter.limit as usize;
         Ok(results.into_iter().skip(offset).take(limit).collect())
+    }
+
+    fn count_skills(&self, filter: &SkillFilter) -> EngineResult<u64> {
+        // When no filters are set, use the RocksDB estimate-num-keys property
+        // for a fast O(1) count instead of a full scan (mirrors count_memories).
+        // The skills CF holds only skill keys (no separate index CF), so the
+        // estimate is valid ONLY under this invariant; if the CF ever holds
+        // non-skill keys, unfiltered counts must not use the estimate.
+        if filter.name.is_none() && filter.category.is_none() {
+            if let Some(val) = self
+                .db
+                .property_value_cf(self.cf(self.cfs.skills)?, "rocksdb.estimate-num-keys")
+                .ok()
+                .flatten()
+            {
+                if let Ok(count) = val.parse::<u64>() {
+                    return Ok(count);
+                }
+            }
+            // Fall through to full scan if the property is unavailable.
+        }
+
+        // Filtered counts have no secondary index — full scan with
+        // in-memory filtering (same semantics as list_skills).
+        let mut count = 0u64;
+        let iter = self
+            .db
+            .iterator_cf(self.cf(self.cfs.skills)?, IteratorMode::Start);
+
+        for item in iter {
+            let (key, value) = item?;
+            if !key.starts_with(KEY_PREFIX_SKILL.as_bytes()) {
+                continue;
+            }
+
+            let skill: Skill = serde_json::from_slice(&value)?;
+
+            if let Some(ref name) = filter.name {
+                if !skill.name.to_lowercase().contains(&name.to_lowercase()) {
+                    continue;
+                }
+            }
+            if let Some(ref category) = filter.category {
+                if !skill.category.eq_ignore_ascii_case(category) {
+                    continue;
+                }
+            }
+
+            count += 1;
+        }
+
+        Ok(count)
     }
 
     fn update_skill(&self, id: Uuid, patch: &SkillPatch) -> EngineResult<Skill> {
@@ -1772,6 +1928,70 @@ mod tests {
             .is_none());
         // Second delete is idempotent.
         backend.delete_session(created.id).expect("delete again");
+    }
+
+    // -----------------------------------------------------------------------
+    // count_sessions estimate-num-keys fallback (count-fallback-test)
+    // -----------------------------------------------------------------------
+    //
+    // The unfiltered fast path reads `rocksdb.estimate-num-keys` for an O(1)
+    // count. On small stores that estimate is exact, so a plain seeded-store
+    // test cannot distinguish the fast path from the fallback. These tests use
+    // the test-only `force_session_count_fallback` seam to make the property
+    // read report unavailable, forcing `count_sessions` down the exact
+    // full-scan fallback (property unavailable -> exact scan).
+
+    #[test]
+    fn test_count_sessions_fallback_exact_on_seeded_store() {
+        let (mut backend, _dir) = setup_db();
+
+        // Mixed store: sessions across multiple projects and agents.
+        for project in ["alpha", "beta", "gamma"] {
+            for _ in 0..2 {
+                backend
+                    .create_session(NewSession {
+                        project: project.into(),
+                        agent_id: Uuid::now_v7(),
+                        status: Some(SessionStatus::Active),
+                        metadata: None,
+                    })
+                    .expect("create session");
+            }
+        }
+
+        // Force the estimate property to be unavailable (test-only seam).
+        backend.force_session_count_fallback = true;
+
+        // Prove the fast path is disabled: the estimate read must report
+        // unavailable so count_sessions cannot take the O(1) branch.
+        assert_eq!(
+            backend.estimated_session_count().expect("estimate read"),
+            None,
+            "seam must make the estimate unavailable so the fallback runs"
+        );
+
+        // Unfiltered count must therefore come from the full scan: exact total.
+        let count = backend
+            .count_sessions(&SessionFilter::default())
+            .expect("count sessions");
+        assert_eq!(count, 6, "fallback full scan must return the exact total");
+    }
+
+    #[test]
+    fn test_count_sessions_fallback_empty_store_returns_zero() {
+        let (mut backend, _dir) = setup_db();
+        backend.force_session_count_fallback = true;
+
+        assert_eq!(
+            backend.estimated_session_count().expect("estimate read"),
+            None,
+            "seam must make the estimate unavailable so the fallback runs"
+        );
+
+        let count = backend
+            .count_sessions(&SessionFilter::default())
+            .expect("count sessions");
+        assert_eq!(count, 0, "fallback on an empty store must count zero");
     }
 
     // -----------------------------------------------------------------------

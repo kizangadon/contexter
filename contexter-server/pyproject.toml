@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 license = {text = "MIT"}
 dependencies = [
     "fastapi>=0.115",
-    "fastmcp>=0.3",
+    "fastmcp~=3.4.0",
     "uvicorn[standard]>=0.30",
     "pydantic>=2.0,<3",
     "structlog>=0.24",
@@ -41,6 +41,17 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# Scoped suppression (REQ-SW-002): starlette 0.38.6 (the maximum permitted by
+# fastapi 0.115.x's `starlette<0.39.0` cap) imports python-multipart via the
+# legacy `multipart` name, so python-multipart 0.0.32 raises
+# PendingDeprecationWarning ("Please use `import python_multipart` instead.")
+# from starlette/formparsers.py.  starlette >= 0.45 fixes the import at the
+# source but breaks the fastmcp 3.4.0 transport tests
+# (tests/mcp/test_framework_efs_coverage.py), so this exact warning is
+# suppressed here instead.  Any other warning still surfaces (REQ-SW-003).
+filterwarnings = [
+    'ignore:Please use `import python_multipart` instead.:PendingDeprecationWarning:starlette\.formparsers',
+]
 
 [tool.coverage.run]
 source = ["contexter_server"]

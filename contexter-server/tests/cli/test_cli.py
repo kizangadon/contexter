@@ -423,31 +423,40 @@ class TestStatus:
     def test_status_shows_system_info(self, mock_storage: AsyncMock, runner: CliRunner) -> None:
         engine_instance = mock_storage.return_value
 
-        # Wire up all the async methods the status command calls
+        # Wire up all the async methods the status command calls. Shapes
+        # mirror the real Rust engine (snake_case cache_telemetry, camelCase
+        # storage_size, nested status cacheTelemetry).
         engine_instance.status = AsyncMock(
             return_value={
                 "status": "ok",
-                "uptime_seconds": 3600,
-                "memory_usage_mb": 42.5,
-                "cpu_percent": 12.3,
-                "latency_ms": 5.0,
+                "version": "0.1.0",
+                "cacheTelemetry": {
+                    "entriesByType": {"agent": 3, "session": 10, "skill": 5},
+                    "hitRatio": 0.0,
+                    "hits": 0,
+                    "misses": 0,
+                    "totalOps": 5000,
+                },
             }
         )
         engine_instance.storage_size = AsyncMock(
-            return_value={"total_bytes": 1048576}
+            return_value={"perCf": {}, "total": 1048576, "walSize": 0}
         )
         engine_instance.cache_telemetry = AsyncMock(
             return_value={
-                "total_sessions": 10,
-                "total_memories": 100,
-                "total_agents": 3,
-                "total_skills": 5,
-                "cache_entries": 50,
-                "avg_response_time_ms": 2.5,
-                "total_operations": 5000,
-                "cache_hit_rate": 0.85,
+                "gets": 1000,
+                "hits": 850,
+                "misses": 150,
+                "stores": 15,
+                "invalidations": 3,
+                "total_ops": 5000,
+                "entries_by_type": {"agent": 3, "session": 10, "skill": 5},
             }
         )
+        engine_instance.count_sessions = AsyncMock(return_value=10)
+        engine_instance.count_memories = AsyncMock(return_value=100)
+        engine_instance.count_agents = AsyncMock(return_value=3)
+        engine_instance.count_skills = AsyncMock(return_value=5)
 
         result = runner.invoke(cli, ["status"])
 

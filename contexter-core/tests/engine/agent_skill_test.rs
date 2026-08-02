@@ -2,7 +2,8 @@
 //! and file_path validation.
 
 use contexter_core::{
-    AgentFilter, AgentPatch, AgentStatus, NewAgent, NewSkill, SkillFilter, SkillPatch,
+    AgentFilter, AgentPatch, AgentStatus, NewAgent, NewSession, NewSkill, SessionFilter,
+    SessionStatus, SkillFilter, SkillPatch,
 };
 use uuid::Uuid;
 
@@ -138,6 +139,227 @@ fn test_skill_roundtrip() {
         .get_skill(skill.id)
         .expect("get after delete")
         .is_none());
+}
+
+// ---------------------------------------------------------------------------
+// Count agents / skills (REQ-ACE-001: dedicated store-backed counters)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_count_agents_matches_store() {
+    let (engine, _dir) = common::setup_engine();
+
+    for i in 0..3 {
+        engine
+            .create_agent(NewAgent {
+                name: format!("count-agent-{i}"),
+                agent_type: "chat".into(),
+                description: "count test".into(),
+                capabilities: None,
+                status: Some(AgentStatus::Active),
+                config: None,
+            })
+            .expect("create agent");
+    }
+
+    let count = engine
+        .count_agents(&AgentFilter::default())
+        .expect("count agents");
+    assert_eq!(count, 3, "unfiltered count must match the store");
+}
+
+#[test]
+fn test_count_agents_with_status_filter() {
+    let (engine, _dir) = common::setup_engine();
+
+    for i in 0..2 {
+        engine
+            .create_agent(NewAgent {
+                name: format!("active-{i}"),
+                agent_type: "chat".into(),
+                description: "count test".into(),
+                capabilities: None,
+                status: Some(AgentStatus::Active),
+                config: None,
+            })
+            .expect("create active agent");
+    }
+    engine
+        .create_agent(NewAgent {
+            name: "inactive".into(),
+            agent_type: "chat".into(),
+            description: "count test".into(),
+            capabilities: None,
+            status: Some(AgentStatus::Inactive),
+            config: None,
+        })
+        .expect("create inactive agent");
+
+    let active = engine
+        .count_agents(&AgentFilter {
+            status: Some(AgentStatus::Active),
+            ..AgentFilter::default()
+        })
+        .expect("count active agents");
+    assert_eq!(active, 2, "status-filtered count must match the store");
+
+    let all = engine
+        .count_agents(&AgentFilter::default())
+        .expect("count all agents");
+    assert_eq!(all, 3);
+}
+
+#[test]
+fn test_count_skills_matches_store() {
+    let (engine, _dir) = common::setup_engine();
+
+    for i in 0..2 {
+        engine
+            .create_skill(NewSkill {
+                name: format!("count-skill-{i}"),
+                description: "count test".into(),
+                category: "dev".into(),
+                file_path: None,
+            })
+            .expect("create skill");
+    }
+
+    let count = engine
+        .count_skills(&SkillFilter::default())
+        .expect("count skills");
+    assert_eq!(count, 2, "unfiltered count must match the store");
+}
+
+#[test]
+fn test_count_skills_with_category_filter() {
+    let (engine, _dir) = common::setup_engine();
+
+    engine
+        .create_skill(NewSkill {
+            name: "review".into(),
+            description: "count test".into(),
+            category: "dev".into(),
+            file_path: None,
+        })
+        .expect("create dev skill");
+    engine
+        .create_skill(NewSkill {
+            name: "translate".into(),
+            description: "count test".into(),
+            category: "language".into(),
+            file_path: None,
+        })
+        .expect("create language skill");
+
+    let dev = engine
+        .count_skills(&SkillFilter {
+            category: Some("dev".into()),
+            ..SkillFilter::default()
+        })
+        .expect("count dev skills");
+    assert_eq!(dev, 1, "category-filtered count must match the store");
+
+    let all = engine
+        .count_skills(&SkillFilter::default())
+        .expect("count all skills");
+    assert_eq!(all, 2);
+}
+
+// ---------------------------------------------------------------------------
+// Count sessions (REQ-CS-001..004: unfiltered estimate fast path parity)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_count_sessions_matches_store() {
+    let (engine, _dir) = common::setup_engine();
+
+    // Interleave agents/skills with sessions to prove the sessions CF count
+    // is independent of other entity stores (AC-CS-001).
+    engine
+        .create_agent(NewAgent {
+            name: "unrelated-agent".into(),
+            agent_type: "chat".into(),
+            description: "count test".into(),
+            capabilities: None,
+            status: Some(AgentStatus::Active),
+            config: None,
+        })
+        .expect("create agent");
+
+    let agent_id = Uuid::now_v7();
+    for i in 0..3 {
+        engine
+            .create_session(NewSession {
+                project: format!("count-project-{i}"),
+                agent_id,
+                status: Some(SessionStatus::Active),
+                metadata: None,
+            })
+            .expect("create session");
+    }
+
+    let count = engine
+        .count_sessions(&SessionFilter::default())
+        .expect("count sessions");
+    assert_eq!(count, 3, "unfiltered count must match the store");
+}
+
+#[test]
+fn test_count_sessions_empty_store_returns_zero() {
+    let (engine, _dir) = common::setup_engine();
+
+    let count = engine
+        .count_sessions(&SessionFilter::default())
+        .expect("count sessions");
+    assert_eq!(count, 0, "empty store must count zero");
+}
+
+#[test]
+fn test_count_sessions_with_project_filter() {
+    let (engine, _dir) = common::setup_engine();
+    let agent_id = Uuid::now_v7();
+
+    for i in 0..3 {
+        engine
+            .create_session(NewSession {
+                project: "alpha".into(),
+                agent_id,
+                status: Some(SessionStatus::Active),
+                metadata: None,
+            })
+            .expect("create alpha session");
+    }
+    for i in 0..2 {
+        engine
+            .create_session(NewSession {
+                project: "beta".into(),
+                agent_id,
+                status: Some(SessionStatus::Active),
+                metadata: None,
+            })
+            .expect("create beta session");
+    }
+
+    let alpha = engine
+        .count_sessions(&SessionFilter {
+            project: Some("alpha".into()),
+            ..SessionFilter::default()
+        })
+        .expect("count alpha sessions");
+    assert_eq!(alpha, 3, "project-filtered count must match the store");
+
+    let beta = engine
+        .count_sessions(&SessionFilter {
+            project: Some("beta".into()),
+            ..SessionFilter::default()
+        })
+        .expect("count beta sessions");
+    assert_eq!(beta, 2, "project-filtered count must match the store");
+
+    let all = engine
+        .count_sessions(&SessionFilter::default())
+        .expect("count all sessions");
+    assert_eq!(all, 5);
 }
 
 // ---------------------------------------------------------------------------

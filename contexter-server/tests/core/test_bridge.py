@@ -8,6 +8,8 @@ import pytest
 from contexter_server.core.bridge import (
     StorageEngine,
     _LARGE_CONTENT_THRESHOLD,
+    _camelize_payload_keys,
+    _snake_to_camel,
     _truncated_args_summary,
 )
 
@@ -56,45 +58,69 @@ class TestStorageEngineInit:
             assert engine._max_workers == 8
 
     def test_init_env_var_override(self):
-        """CONtexTER_BRIDGE_POOL_SIZE env var should override default."""
+        """CONTEXTER_BRIDGE_POOL_SIZE env var should override default."""
         import os
-        os.environ["CONtexTER_BRIDGE_POOL_SIZE"] = "16"
+        os.environ["CONTEXTER_BRIDGE_POOL_SIZE"] = "16"
         try:
             with patch("contexter_server.core.bridge._SyncEngine") as mock:
                 mock.open.return_value = MagicMock()
                 engine = StorageEngine(path="/tmp/test")
                 assert engine._max_workers == 16
         finally:
-            del os.environ["CONtexTER_BRIDGE_POOL_SIZE"]
+            del os.environ["CONTEXTER_BRIDGE_POOL_SIZE"]
 
     def test_init_explicit_param_overrides_env_var(self):
         """Explicit max_workers should take precedence over env var."""
         import os
-        os.environ["CONtexTER_BRIDGE_POOL_SIZE"] = "2"
+        os.environ["CONTEXTER_BRIDGE_POOL_SIZE"] = "2"
         try:
             with patch("contexter_server.core.bridge._SyncEngine") as mock:
                 mock.open.return_value = MagicMock()
                 engine = StorageEngine(path="/tmp/test", max_workers=12)
                 assert engine._max_workers == 12
         finally:
-            del os.environ["CONtexTER_BRIDGE_POOL_SIZE"]
+            del os.environ["CONTEXTER_BRIDGE_POOL_SIZE"]
 
     def test_init_env_var_invalid_falls_back(self):
-        """Invalid CONtexTER_BRIDGE_POOL_SIZE should fall back to default."""
+        """Invalid CONTEXTER_BRIDGE_POOL_SIZE should fall back to default."""
         import os
-        os.environ["CONtexTER_BRIDGE_POOL_SIZE"] = "not-a-number"
+        os.environ["CONTEXTER_BRIDGE_POOL_SIZE"] = "not-a-number"
         try:
             with patch("contexter_server.core.bridge._SyncEngine") as mock:
                 mock.open.return_value = MagicMock()
                 engine = StorageEngine(path="/tmp/test")
                 assert engine._max_workers == 8
         finally:
-            del os.environ["CONtexTER_BRIDGE_POOL_SIZE"]
+            del os.environ["CONTEXTER_BRIDGE_POOL_SIZE"]
 
     def test_init_env_var_zero_falls_back(self):
-        """CONtexTER_BRIDGE_POOL_SIZE=0 should fall back to default."""
+        """CONTEXTER_BRIDGE_POOL_SIZE=0 should fall back to default."""
         import os
-        os.environ["CONtexTER_BRIDGE_POOL_SIZE"] = "0"
+        os.environ["CONTEXTER_BRIDGE_POOL_SIZE"] = "0"
+        try:
+            with patch("contexter_server.core.bridge._SyncEngine") as mock:
+                mock.open.return_value = MagicMock()
+                engine = StorageEngine(path="/tmp/test")
+                assert engine._max_workers == 8
+        finally:
+            del os.environ["CONTEXTER_BRIDGE_POOL_SIZE"]
+
+    def test_init_env_var_negative_falls_back(self):
+        """Negative CONTEXTER_BRIDGE_POOL_SIZE should fall back to default."""
+        import os
+        os.environ["CONTEXTER_BRIDGE_POOL_SIZE"] = "-5"
+        try:
+            with patch("contexter_server.core.bridge._SyncEngine") as mock:
+                mock.open.return_value = MagicMock()
+                engine = StorageEngine(path="/tmp/test")
+                assert engine._max_workers == 8
+        finally:
+            del os.environ["CONTEXTER_BRIDGE_POOL_SIZE"]
+
+    def test_init_typo_env_var_ignored(self):
+        """The misspelled legacy CONtexTER_* env var must be ignored (REQ-EV-002)."""
+        import os
+        os.environ["CONtexTER_BRIDGE_POOL_SIZE"] = "16"
         try:
             with patch("contexter_server.core.bridge._SyncEngine") as mock:
                 mock.open.return_value = MagicMock()
@@ -103,16 +129,18 @@ class TestStorageEngineInit:
         finally:
             del os.environ["CONtexTER_BRIDGE_POOL_SIZE"]
 
-    def test_init_env_var_negative_falls_back(self):
-        """Negative CONtexTER_BRIDGE_POOL_SIZE should fall back to default."""
+    def test_init_canonical_env_var_wins_over_typo(self):
+        """CONTEXTER_BRIDGE_POOL_SIZE takes precedence over the legacy typo (EC-EV-001)."""
         import os
-        os.environ["CONtexTER_BRIDGE_POOL_SIZE"] = "-5"
+        os.environ["CONTEXTER_BRIDGE_POOL_SIZE"] = "16"
+        os.environ["CONtexTER_BRIDGE_POOL_SIZE"] = "2"
         try:
             with patch("contexter_server.core.bridge._SyncEngine") as mock:
                 mock.open.return_value = MagicMock()
                 engine = StorageEngine(path="/tmp/test")
-                assert engine._max_workers == 8
+                assert engine._max_workers == 16
         finally:
+            del os.environ["CONTEXTER_BRIDGE_POOL_SIZE"]
             del os.environ["CONtexTER_BRIDGE_POOL_SIZE"]
 
     def test_os_expanduser_called(self):
@@ -138,7 +166,10 @@ class TestStorageEngineSession:
 
         result = await engine.create_session(session_data)
         assert result["id"] == "sess-1"
-        mock.create_session.assert_called_once_with(json.dumps(session_data))
+        # The bridge translates top-level keys to the engine's camelCase contract
+        mock.create_session.assert_called_once_with(
+            json.dumps({"agentId": "uuid-1", "project": "test"})
+        )
 
     @pytest.mark.asyncio
     async def test_get_session_found(self, mock_engine):
@@ -232,7 +263,17 @@ class TestStorageEngineMemory:
         mock.create_memory.return_value = json.dumps({"id": "mem-1", **mem_data})
         result = await engine.create_memory(mem_data)
         assert result["id"] == "mem-1"
-        mock.create_memory.assert_called_once_with(json.dumps(mem_data))
+        # The bridge translates top-level keys to the engine's camelCase contract
+        mock.create_memory.assert_called_once_with(
+            json.dumps(
+                {
+                    "sessionId": "sid-1",
+                    "agentId": "aid-1",
+                    "role": "user",
+                    "content": "Hello",
+                }
+            )
+        )
 
     @pytest.mark.asyncio
     async def test_create_memory_large_content(self, mock_engine):
@@ -252,8 +293,12 @@ class TestStorageEngineMemory:
         mock.create_memory_bytes.assert_called_once()
         args = mock.create_memory_bytes.call_args[0]
         meta = json.loads(args[0])
-        assert meta["session_id"] == "sid-1"
-        assert "content" not in meta
+        # The bridge translates top-level keys to the engine's camelCase contract
+        assert meta["sessionId"] == "sid-1"
+        # Rust NewMemory requires a content field; the bytes arg overwrites it,
+        # so the bridge sends an empty placeholder instead of duplicating the
+        # full content in the JSON payload (double-encode avoidance).
+        assert meta["content"] == ""
         assert isinstance(args[1], bytes)
         assert len(args[1]) == 102400
 
@@ -397,6 +442,22 @@ class TestStorageEngineAgent:
         assert call_arg["offset"] == 5
 
     @pytest.mark.asyncio
+    async def test_count_agents(self, mock_engine):
+        engine, mock = mock_engine
+        mock.count_agents.return_value = 3
+        result = await engine.count_agents({"status": "active"})
+        assert result == 3
+        mock.count_agents.assert_called_once_with(json.dumps({"status": "active"}))
+
+    @pytest.mark.asyncio
+    async def test_count_agents_no_filter(self, mock_engine):
+        engine, mock = mock_engine
+        mock.count_agents.return_value = 0
+        result = await engine.count_agents()
+        assert result == 0
+        mock.count_agents.assert_called_once_with("{}")
+
+    @pytest.mark.asyncio
     async def test_update_agent(self, mock_engine):
         engine, mock = mock_engine
         mock.update_agent.return_value = json.dumps({"id": "agent-1", "temperature": 0.5})
@@ -447,6 +508,22 @@ class TestStorageEngineSkill:
         assert call_arg["offset"] == 2
 
     @pytest.mark.asyncio
+    async def test_count_skills(self, mock_engine):
+        engine, mock = mock_engine
+        mock.count_skills.return_value = 2
+        result = await engine.count_skills({"category": "dev"})
+        assert result == 2
+        mock.count_skills.assert_called_once_with(json.dumps({"category": "dev"}))
+
+    @pytest.mark.asyncio
+    async def test_count_skills_no_filter(self, mock_engine):
+        engine, mock = mock_engine
+        mock.count_skills.return_value = 0
+        result = await engine.count_skills()
+        assert result == 0
+        mock.count_skills.assert_called_once_with("{}")
+
+    @pytest.mark.asyncio
     async def test_update_skill(self, mock_engine):
         engine, mock = mock_engine
         mock.update_skill.return_value = json.dumps({"id": "skill-1", "enabled": False})
@@ -495,7 +572,10 @@ class TestStorageEngineAudit:
         entry = {"entity_type": "session", "entity_id": "s-1", "action": "created"}
         mock.log_audit.return_value = None
         await engine.log_audit(entry)
-        mock.log_audit.assert_called_once_with(json.dumps(entry))
+        # The bridge translates top-level keys to the engine's camelCase contract
+        mock.log_audit.assert_called_once_with(
+            json.dumps({"entityType": "session", "entityId": "s-1", "action": "created"})
+        )
 
     @pytest.mark.asyncio
     async def test_query_audit(self, mock_engine):
@@ -571,8 +651,10 @@ class TestStorageEngineErrors:
             await engine._run("nonexistent_method")
 
     @pytest.mark.asyncio
-    async def test_create_session_engine_error(self, mock_engine):
+    async def test_create_session_engine_error(self, mock_engine, monkeypatch, tmp_path):
         """Engine errors should propagate as Python exceptions."""
+        # Pin the diagnostics log away from the real ~/.contexter launch log.
+        monkeypatch.setenv("CONTEXTER_LOG_FILE", str(tmp_path / "launch.log"))
         engine, mock = mock_engine
         mock.create_session.side_effect = RuntimeError("Engine failure")
         with pytest.raises(RuntimeError, match="Engine failure"):
@@ -584,7 +666,6 @@ class TestStorageEngineImport:
 
     def test_import_from_contexter_core(self):
         """StorageEngine should import _SyncEngine from contexter_core."""
-        import contexter_server.core.bridge as bridge_module
 
         # Verify the import source
         with patch("contexter_server.core.bridge._SyncEngine") as mock:
@@ -606,8 +687,9 @@ class TestStorageEngineLogging:
         with patch("contexter_server.core.bridge.logger") as mock_logger:
             await engine.create_session({"project": "test"})
 
-            # Exactly one info call — start+end combined
-            mock_logger.info.assert_called_once_with(
+            # Exactly one debug call — start+end combined; per-call logs are
+            # DEBUG (REQ-PLB-001), not INFO
+            mock_logger.debug.assert_called_once_with(
                 "bridge_call_end",
                 method="create_session",
                 args_summary=ANY,
@@ -625,13 +707,15 @@ class TestStorageEngineLogging:
         with patch("contexter_server.core.bridge.logger") as mock_logger:
             await engine.create_memory(mem)
 
-            mock_logger.info.assert_called_once()
-            summary = mock_logger.info.call_args.kwargs.get("args_summary", "")
+            mock_logger.debug.assert_called_once()
+            summary = mock_logger.debug.call_args.kwargs.get("args_summary", "")
             assert len(summary) <= 200
 
     @pytest.mark.asyncio
-    async def test_run_logs_exception(self, mock_engine):
-        """_run should log exception with logger.exception before propagating."""
+    async def test_run_logs_exception(self, mock_engine, monkeypatch, tmp_path):
+        """_run should log a concise structured error (no traceback) before propagating."""
+        # Pin the diagnostics log away from the real ~/.contexter launch log.
+        monkeypatch.setenv("CONTEXTER_LOG_FILE", str(tmp_path / "launch.log"))
         engine, mock = mock_engine
         mock.create_session.side_effect = RuntimeError("Engine failure")
 
@@ -639,9 +723,14 @@ class TestStorageEngineLogging:
             with pytest.raises(RuntimeError, match="Engine failure"):
                 await engine.create_session({"project": "test"})
 
-            mock_logger.exception.assert_called_once()
-            args, _ = mock_logger.exception.call_args
+            mock_logger.error.assert_called_once()
+            args, kwargs = mock_logger.error.call_args
             assert "bridge_call_failed" in args
+            assert kwargs.get("exc_info") is None, (
+                "the concise error must never carry exc_info (traceback)"
+            )
+            assert kwargs.get("method") == "create_session"
+            mock_logger.exception.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_run_no_start_log(self, mock_engine):
@@ -652,8 +741,8 @@ class TestStorageEngineLogging:
         with patch("contexter_server.core.bridge.logger") as mock_logger:
             await engine.create_session({"project": "test"})
 
-            # Ensure no bridge_call_start was logged
-            for call in mock_logger.info.call_args_list:
+            # Ensure no bridge_call_start was logged (per-call end event is DEBUG)
+            for call in mock_logger.debug.call_args_list:
                 event = call.args[0] if call.args else None
                 assert event != "bridge_call_start"
 
@@ -716,6 +805,58 @@ class TestTruncatedArgsSummary:
         result = _truncated_args_summary((huge,), max_len=50)
         assert len(result) <= 50
 
+    def test_content_capped_at_documented_bound(self):
+        """Content-bearing args are capped at the documented 64-char bound (REQ-BH-001)."""
+        content = "x" * 10_000
+        result = _truncated_args_summary((content,))
+        assert len(result) <= 200
+        assert "..." in result
+        assert result.count("x") <= 64
+
+    def test_full_content_never_appears(self):
+        """The full content must never appear verbatim in the summary (REQ-BH-002)."""
+        content = "a" * 10_000
+        result = _truncated_args_summary((content,))
+        assert content not in result
+
+    def test_full_bytes_never_appears(self):
+        """The full bytes content must never appear verbatim in the summary."""
+        content = b"b" * 10_000
+        result = _truncated_args_summary((content,))
+        # The result is bounded (<=200 chars) so the 10KB payload cannot fit;
+        # the bytes-level cap must still hold for the visible prefix.
+        assert result.count("b") <= 64
+
+    def test_exactly_at_cap_fully_logged(self):
+        """Content exactly at the cap is logged in full without truncation marker (EC-BH-001)."""
+        content = "c" * 64
+        result = _truncated_args_summary((content,))
+        assert content in result
+        assert "..." not in result
+
+    def test_empty_string_placeholder(self):
+        """Empty string args render as a placeholder, not '' (EC-BH-003)."""
+        result = _truncated_args_summary(("",))
+        assert "'<empty>'" in result
+
+    def test_empty_bytes_placeholder(self):
+        """Empty bytes args render as a placeholder (EC-BH-003)."""
+        result = _truncated_args_summary((b"",))
+        assert "b'<empty>'" in result
+
+    def test_multibyte_capped_by_chars(self):
+        """Multibyte content is capped by characters, never split mid-codepoint (EC-BH-004)."""
+        content = "\u4e2d" * 100  # 300 bytes
+        result = _truncated_args_summary((content,))
+        assert result.count("\u4e2d") <= 64
+        assert "..." in result
+
+    def test_secret_like_value_never_appears(self):
+        """Long secret-like values must never appear verbatim (REQ-BH-003)."""
+        secret = "sk-live-" + "a" * 100
+        result = _truncated_args_summary((secret,))
+        assert secret not in result
+
 
 class TestStorageEngineThreadPool:
     """ThreadPoolExecutor routing tests."""
@@ -732,8 +873,53 @@ class TestStorageEngineThreadPool:
         assert not engine._pool._shutdown
 
 
+class _CountingStr(str):
+    """str subclass that counts encode() calls to prove single-encoding."""
+
+    def __new__(cls, value: str) -> "_CountingStr":
+        obj = str.__new__(cls, value)
+        obj.encode_calls = 0
+        return obj
+
+    def encode(self, *args, **kwargs) -> bytes:
+        self.encode_calls += 1
+        return super().encode(*args, **kwargs)
+
+
 class TestStorageEngineLargeContentByteLength:
     """Tests for byte-length-based large content detection (Bug 4)."""
+
+    @pytest.mark.asyncio
+    async def test_create_memory_bytes_path_encodes_content_once(self, mock_engine):
+        """Bytes path must encode content exactly once (PF-02 double-encode fix)."""
+        engine, mock = mock_engine
+        content = _CountingStr("x" * _LARGE_CONTENT_THRESHOLD)
+        mem_data = {
+            "session_id": "sid-1",
+            "agent_id": "aid-1",
+            "role": "user",
+            "content": content,
+        }
+        mock.create_memory_bytes.return_value = json.dumps({"id": "mem-1"})
+        result = await engine.create_memory(mem_data)
+        assert result["id"] == "mem-1"
+        assert content.encode_calls == 1
+        args = mock.create_memory_bytes.call_args[0]
+        assert args[1] == b"x" * _LARGE_CONTENT_THRESHOLD
+
+    @pytest.mark.asyncio
+    async def test_update_memory_bytes_path_encodes_content_once(self, mock_engine):
+        """update_memory bytes path must encode content exactly once (PF-02)."""
+        engine, mock = mock_engine
+        content = _CountingStr("y" * _LARGE_CONTENT_THRESHOLD)
+        patch = {"content": content, "tokens": 100}
+        mock.update_memory_bytes.return_value = json.dumps({"id": "mem-1"})
+        result = await engine.update_memory("mem-1", patch)
+        assert result is not None
+        assert content.encode_calls == 1
+        args = mock.update_memory_bytes.call_args[0]
+        assert args[0] == "mem-1"
+        assert args[2] == b"y" * _LARGE_CONTENT_THRESHOLD
 
     @pytest.mark.asyncio
     async def test_create_memory_ascii_at_threshold(self, mock_engine):
@@ -813,3 +999,117 @@ class TestStorageEngineLargeContentByteLength:
         assert result is not None
         mock.update_memory_bytes.assert_called_once()
         mock.update_memory.assert_not_called()
+
+
+class TestCamelizePayloadKeys:
+    """Invariant tests for _snake_to_camel / _camelize_payload_keys (SEC-F04).
+
+    Documented collision policy (REQ-CCI-002): camelization is a many-to-one
+    mapping — ``foo_bar``, ``foo__bar`` and ``fooBar`` all map to ``fooBar``.
+    When two input keys map to the same camelCase key, the LAST key in
+    insertion order wins (Python dict-comprehension semantics); no error is
+    raised. The output is fully deterministic for a given input dict, and no
+    key that maps to a DISTINCT camelCase form is ever lost — data loss is
+    confined to the documented last-wins collision policy.
+    """
+
+    def test_snake_to_camel_agent_id(self):
+        """agent_id should become agentId."""
+        assert _snake_to_camel("agent_id") == "agentId"
+
+    def test_snake_to_camel_memory_type(self):
+        """memory_type should become memoryType."""
+        assert _snake_to_camel("memory_type") == "memoryType"
+
+    def test_snake_to_camel_entity_type(self):
+        """entity_type should become entityType."""
+        assert _snake_to_camel("entity_type") == "entityType"
+
+    def test_snake_to_camel_plain_word_unchanged(self):
+        """Keys without underscores should pass through unchanged."""
+        assert _snake_to_camel("project") == "project"
+
+    def test_snake_to_camel_camelcase_identity(self):
+        """Already-camelCase keys must be left untouched (no double transform)."""
+        assert _snake_to_camel("agentId") == "agentId"
+        assert _snake_to_camel("memoryType") == "memoryType"
+        assert _snake_to_camel("fooBar") == "fooBar"
+
+    def test_snake_to_camel_double_underscore_collapses(self):
+        """foo__bar collapses to fooBar — collides with foo_bar and fooBar."""
+        assert _snake_to_camel("foo__bar") == "fooBar"
+
+    def test_snake_to_camel_leading_underscore_collides(self):
+        """_foo maps to Foo — collides with an already-camel 'Foo' key."""
+        assert _snake_to_camel("_foo") == "Foo"
+
+    def test_snake_to_camel_trailing_underscore_collides(self):
+        """foo_ maps to foo — collides with a plain 'foo' key."""
+        assert _snake_to_camel("foo_") == "foo"
+
+    def test_snake_to_camel_a_b_maps_to_aB_not_ab(self):
+        """a_b maps to aB (not ab) — the a_b/ab pair is a trap, NOT a collision."""
+        assert _snake_to_camel("a_b") == "aB"
+        assert _snake_to_camel("ab") == "ab"
+
+    def test_snake_to_camel_empty_string(self):
+        """Empty string maps to empty string."""
+        assert _snake_to_camel("") == ""
+
+    def test_camelize_empty_payload(self):
+        """Empty payload yields an empty dict."""
+        assert _camelize_payload_keys({}) == {}
+
+    def test_camelize_top_level_keys_only(self):
+        """Nested dict values pass through untouched (opaque engine values)."""
+        payload = {"meta_data": {"user_id": 1, "created_at": "t"}}
+        result = _camelize_payload_keys(payload)
+        assert result == {"metaData": {"user_id": 1, "created_at": "t"}}
+
+    def test_camelize_non_string_keys_passthrough(self):
+        """Non-string keys are never camelized."""
+        assert _camelize_payload_keys({1: "one", None: "nil"}) == {1: "one", None: "nil"}
+
+    def test_camelize_collision_last_wins_policy(self):
+        """Documented policy: foo_bar and fooBar both map to fooBar; the LAST
+        key in insertion order wins — no error is raised."""
+        payload = {"foo_bar": "snake", "fooBar": "camel"}
+        assert _camelize_payload_keys(payload) == {"fooBar": "camel"}
+
+    def test_camelize_collision_reversed_insertion_order(self):
+        """Reversing insertion order flips the winner — proves the policy is
+        insertion-order last-wins, not value- or lexicographic-ordered."""
+        payload = {"fooBar": "camel", "foo_bar": "snake"}
+        assert _camelize_payload_keys(payload) == {"fooBar": "snake"}
+
+    def test_camelize_double_underscore_collision(self):
+        """foo_bar and foo__bar collide on fooBar; later key wins."""
+        payload = {"foo_bar": 1, "foo__bar": 2}
+        assert _camelize_payload_keys(payload) == {"fooBar": 2}
+
+    def test_camelize_deterministic_same_input_same_output(self):
+        """Adversarial input must yield identical output on every call."""
+        payload = {"foo_bar": 1, "fooBar": 2, "a_b": 3, "aB": 4, "user_name": "don"}
+        first = _camelize_payload_keys(payload)
+        second = _camelize_payload_keys(payload)
+        assert first == second
+        assert list(first.items()) == list(second.items())
+
+    def test_camelize_adversarial_set_no_loss_beyond_policy(self):
+        """Adversarial set: colliding pairs resolve by last-wins; every key
+        mapping to a DISTINCT camelCase form is preserved — no loss beyond the
+        documented collision policy."""
+        payload = {
+            "a_b": 1,
+            "ab": 2,  # NOT a collision: ab -> "ab", a_b -> "aB"
+            "aB": 3,  # collides with a_b -> "aB"; last wins
+            "foo_bar": 4,
+            "foo__bar": 5,  # collides with foo_bar -> "fooBar"; last wins
+            "user_name": "don",
+        }
+        assert _camelize_payload_keys(payload) == {
+            "aB": 3,
+            "ab": 2,
+            "fooBar": 5,
+            "userName": "don",
+        }

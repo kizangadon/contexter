@@ -65,12 +65,12 @@ def create_mcp_server(
     # Log authentication status. Each tool and resource handler validates
     # the ``_api_key`` parameter against this value via
     # ``require_api_key()``.
-    api_key = os.environ.get("CONtexTER_API_KEY", "")
+    api_key = os.environ.get("CONTEXTER_API_KEY", "")
     if api_key:
         logger.info("mcp_server.api_key_configured")
     else:
-        logger.warning(
-            "CONtexTER_API_KEY not set — MCP server has no API key auth"
+        logger.debug(
+            "CONTEXTER_API_KEY not set — MCP server has no API key auth"
         )
 
     mcp = FastMCP(
@@ -87,9 +87,6 @@ def create_mcp_server(
         session_id: str,
         role: str,
         content: str,
-        tokens: int | None = None,
-        tokenizer: str | None = None,
-        model: str | None = None,
         _api_key: str | None = None,
     ) -> dict:
         """Store a new memory entry in an existing session."""
@@ -97,9 +94,6 @@ def create_mcp_server(
             session_id=session_id,
             role=role,
             content=content,
-            tokens=tokens,
-            tokenizer=tokenizer,
-            model=model,
             _api_key=_api_key,
             memory_service=memory_service,
             session_service=session_service,
@@ -201,7 +195,7 @@ def create_mcp_server(
     # Read-only resources (4)
     # ------------------------------------------------------------------
 
-    @mcp.resource("contexter://session/{id}")
+    @mcp.resource("contexter://session/{id}{?_api_key}")
     async def session_resource(
         id: str,
         _api_key: str | None = None,
@@ -213,7 +207,7 @@ def create_mcp_server(
             session_service=session_service,
         )
 
-    @mcp.resource("contexter://memory/{id}")
+    @mcp.resource("contexter://memory/{id}{?_api_key}")
     async def memory_resource(
         id: str,
         _api_key: str | None = None,
@@ -225,7 +219,7 @@ def create_mcp_server(
             memory_service=memory_service,
         )
 
-    @mcp.resource("contexter://agent/{id}")
+    @mcp.resource("contexter://agent/{id}{?_api_key}")
     async def agent_resource(
         id: str,
         _api_key: str | None = None,

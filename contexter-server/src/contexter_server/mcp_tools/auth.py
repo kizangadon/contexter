@@ -1,7 +1,7 @@
 """MCP tool and resource authentication helpers.
 
 Validates API key access for FastMCP tools and resources using the same
-``CONtexTER_API_KEY`` environment variable as the FastAPI REST layer.
+``CONTEXTER_API_KEY`` environment variable as the FastAPI REST layer.
 """
 
 import hmac
@@ -25,7 +25,7 @@ class MCPAuthError(ValueError):
 def require_api_key(api_key: str | None = None) -> None:
     """Validate an API key for MCP tool or resource access.
 
-    When the environment variable ``CONtexTER_API_KEY`` is set, the
+    When the environment variable ``CONTEXTER_API_KEY`` is set, the
     caller *must* supply a matching ``api_key`` value.  When the variable
     is **not** set the check is skipped — this preserves backward
     compatibility for development and environments that do not require
@@ -40,9 +40,9 @@ def require_api_key(api_key: str | None = None) -> None:
     Raises
     ------
     MCPAuthError
-        If ``CONtexTER_API_KEY`` is set and ``api_key`` does not match.
+        If ``CONTEXTER_API_KEY`` is set and ``api_key`` does not match.
     """
-    expected = os.environ.get("CONtexTER_API_KEY", "")
+    expected = os.environ.get("CONTEXTER_API_KEY", "")
     if not expected:
         return  # No auth configured — allow access.
 
@@ -50,7 +50,7 @@ def require_api_key(api_key: str | None = None) -> None:
         _logger.warning("mcp_tool.auth.missing_api_key")
         raise MCPAuthError(
             "API key required. Provide a matching _api_key parameter "
-            "or unset CONtexTER_API_KEY to disable authentication."
+            "or unset CONTEXTER_API_KEY to disable authentication."
         )
 
     if not hmac.compare_digest(api_key, expected):

@@ -5,6 +5,11 @@ from datetime import datetime, timezone
 from contexter_server.core.bridge import StorageEngine
 from contexter_server.models.session import Session, SessionCreate, SessionFilter, SessionPatch
 
+#: Documented upper bound for list_recent_sessions limit (EC-SL-005).
+#: Limits above this are clamped so the engine is never asked to materialise
+#: unbounded result sets (REQ-SL-004).
+MAX_SESSION_LIST_LIMIT = 10_000
+
 
 class SessionService:
     """Domain service for Session aggregate operations."""
@@ -23,10 +28,23 @@ class SessionService:
         raw = await self._engine.get_session(id)
         return Session.model_validate(raw) if raw else None
 
-    async def list(self, filter: SessionFilter | None = None) -> list[Session]:
-        raw_list = await self._engine.list_sessions(
-            filter.model_dump(exclude_none=True) if filter else None
-        )
+    async def list(
+        self, filter: SessionFilter | None = None, limit: int | None = None
+    ) -> list[Session]:
+        """List sessions, optionally pushing a clamped limit to the engine.
+
+        ``limit=None`` keeps the engine's default page size (100) — the
+        backward-compatible behaviour (REQ-SL-001). A negative limit clamps
+        to 0 (EC-SL-004); a limit above ``MAX_SESSION_LIST_LIMIT`` clamps to
+        the documented maximum (EC-SL-005). The engine performs the actual
+        slicing, so only ``limit`` rows cross the bridge (REQ-SL-004).
+        """
+        filter_dict = filter.model_dump(exclude_none=True) if filter else None
+        if limit is None:
+            raw_list = await self._engine.list_sessions(filter_dict)
+        else:
+            clamped_limit = max(0, min(limit, MAX_SESSION_LIST_LIMIT))
+            raw_list = await self._engine.list_sessions(filter_dict, limit=clamped_limit)
         return [Session.model_validate(r) for r in raw_list]
 
     async def update(self, id: str, patch: SessionPatch) -> Session | None:

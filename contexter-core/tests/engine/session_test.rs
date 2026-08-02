@@ -307,10 +307,21 @@ fn test_concurrent_operations() {
     }
 
     // Verify total count is correct: 4 threads × 25 sessions = 100.
-    let total = engine
-        .count_sessions(&SessionFilter::default())
-        .expect("count sessions");
-    assert_eq!(total, 100, "should have 100 sessions across all threads");
+    // NOTE: the unfiltered count_sessions is now an O(1) estimate
+    // (rocksdb.estimate-num-keys, REQ-CS-001) that can lag updates, so the
+    // concurrency invariant (no lost writes) is asserted with the exact
+    // list_sessions full scan instead.
+    let all = engine
+        .list_sessions(&SessionFilter {
+            limit: u64::MAX,
+            ..SessionFilter::default()
+        })
+        .expect("list sessions");
+    assert_eq!(
+        all.len(),
+        100,
+        "should have 100 sessions across all threads"
+    );
 }
 
 // ---------------------------------------------------------------------------

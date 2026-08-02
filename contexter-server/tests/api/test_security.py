@@ -8,6 +8,7 @@ import os
 from unittest import mock
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 # ---------------------------------------------------------------------------
@@ -20,19 +21,19 @@ class TestApiKeyAuth:
 
     def test_health_without_auth_when_key_configured(self, client: TestClient) -> None:
         """Health endpoint is accessible without auth even when API key is set."""
-        with mock.patch.dict(os.environ, {"CONtexTER_API_KEY": "test-key-123"}):
+        with mock.patch.dict(os.environ, {"CONTEXTER_API_KEY": "test-key-123"}):
             resp = client.get("/health")
         assert resp.status_code == 200
 
     def test_api_v1_rejects_missing_key(self, client: TestClient) -> None:
         """API v1 endpoint rejects request without auth when key configured."""
-        with mock.patch.dict(os.environ, {"CONtexTER_API_KEY": "test-key-123"}):
+        with mock.patch.dict(os.environ, {"CONTEXTER_API_KEY": "test-key-123"}):
             resp = client.get("/api/v1/sessions")
         assert resp.status_code == 401
 
     def test_api_v1_rejects_wrong_key(self, client: TestClient) -> None:
         """API v1 endpoint rejects request with wrong bearer token."""
-        with mock.patch.dict(os.environ, {"CONtexTER_API_KEY": "test-key-123"}):
+        with mock.patch.dict(os.environ, {"CONTEXTER_API_KEY": "test-key-123"}):
             resp = client.get(
                 "/api/v1/sessions",
                 headers={"Authorization": "Bearer wrong-key"},
@@ -41,7 +42,7 @@ class TestApiKeyAuth:
 
     def test_api_v1_accepts_valid_key(self, client: TestClient) -> None:
         """API v1 endpoint accepts request with correct bearer token."""
-        with mock.patch.dict(os.environ, {"CONtexTER_API_KEY": "test-key-123"}):
+        with mock.patch.dict(os.environ, {"CONTEXTER_API_KEY": "test-key-123"}):
             resp = client.get(
                 "/api/v1/sessions",
                 headers={"Authorization": "Bearer test-key-123"},
@@ -50,13 +51,13 @@ class TestApiKeyAuth:
 
     def test_no_key_configured_allows_all(self, client: TestClient) -> None:
         """When no API key env var is set, all requests pass without auth."""
-        old = os.environ.pop("CONtexTER_API_KEY", None)
+        old = os.environ.pop("CONTEXTER_API_KEY", None)
         try:
             resp = client.get("/api/v1/sessions")
             assert resp.status_code == 200
         finally:
             if old is not None:
-                os.environ["CONtexTER_API_KEY"] = old
+                os.environ["CONTEXTER_API_KEY"] = old
 
     def test_multiple_routers_receive_auth(self, client: TestClient) -> None:
         """Several /api/v1/ routers have the auth dependency applied."""
@@ -74,7 +75,7 @@ class TestApiKeyAuth:
             ("GET", "/api/v1/correlation/overview"),
             ("GET", "/api/v1/changelog"),
         ]
-        with mock.patch.dict(os.environ, {"CONtexTER_API_KEY": "test-key-123"}):
+        with mock.patch.dict(os.environ, {"CONTEXTER_API_KEY": "test-key-123"}):
             for method, path in endpoints:
                 resp = client.request(method, path)
                 assert resp.status_code == 401, (
@@ -131,16 +132,16 @@ class TestOpenApiDocs:
     """8c: Gate OpenAPI Docs (disabled by default)."""
 
     def test_docs_disabled_by_default(self, client: TestClient) -> None:
-        """When CONtexTER_ENABLE_DOCS is not set, docs endpoints return 404."""
-        env_val = os.environ.get("CONtexTER_ENABLE_DOCS")
+        """When CONTEXTER_ENABLE_DOCS is not set, docs endpoints return 404."""
+        env_val = os.environ.get("CONTEXTER_ENABLE_DOCS")
         if env_val and env_val.strip().lower() == "true":
-            pytest.skip("CONtexTER_ENABLE_DOCS is active in this environment")
+            pytest.skip("CONTEXTER_ENABLE_DOCS is active in this environment")
         assert client.get("/docs").status_code == 404
         assert client.get("/redoc").status_code == 404
         assert client.get("/openapi.json").status_code == 404
 
     def test_docs_enabled_with_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """When CONtexTER_ENABLE_DOCS=true, docs endpoints become available."""
+        """When CONTEXTER_ENABLE_DOCS=true, docs endpoints become available."""
 
         # We need a fresh fastapi app created with docs enabled.
         # Re-import create_app after setting the env var so it picks up
@@ -148,7 +149,7 @@ class TestOpenApiDocs:
         import importlib
         import contexter_server.main
 
-        monkeypatch.setenv("CONtexTER_ENABLE_DOCS", "true")
+        monkeypatch.setenv("CONTEXTER_ENABLE_DOCS", "true")
         importlib.reload(contexter_server.main)
         create_app = contexter_server.main.create_app
 
@@ -173,7 +174,7 @@ class TestBodySizeLimit:
         assert resp.status_code < 400
 
     def test_large_content_length_rejected(self, client: TestClient) -> None:
-        """Request with Content-Length exceeding MAX_REQUEST_BODY returns 413."""
+        """Request with Content-Length exceeding the limit returns 413."""
         # Default max is 1 MiB (1 048 576 bytes).
         # Cannot actually send 1 MiB, but can set Content-Length header.
         resp = client.get(
@@ -190,6 +191,36 @@ class TestBodySizeLimit:
         )
         assert resp.status_code == 413
         assert resp.json()["detail"] == "Transfer-Encoding chunked not supported"
+
+    def test_canonical_env_var_honored(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CONTEXTER_MAX_REQUEST_BODY drives the body size limit."""
+        monkeypatch.setenv("CONTEXTER_MAX_REQUEST_BODY", "1000")
+        # Content-Length below the configured limit is accepted.
+        resp = client.get("/api/v1/sessions", headers={"Content-Length": "500"})
+        assert resp.status_code < 400
+        # Content-Length above the configured limit returns 413.
+        resp = client.get("/api/v1/sessions", headers={"Content-Length": "2000"})
+        assert resp.status_code == 413
+
+    def test_legacy_env_name_ignored(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The legacy bare MAX_REQUEST_BODY name no longer affects the limit."""
+        # A limit of 1 byte would reject this request if the legacy name
+        # were still read; the canonical name must be the only source.
+        monkeypatch.setenv("MAX_REQUEST_BODY", "1")
+        resp = client.get("/api/v1/sessions", headers={"Content-Length": "500"})
+        assert resp.status_code < 400
+
+    def test_invalid_env_value_preserves_parsing_behavior(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A non-integer CONTEXTER_MAX_REQUEST_BODY behaves as before (ValueError)."""
+        monkeypatch.setenv("CONTEXTER_MAX_REQUEST_BODY", "not-a-number")
+        with pytest.raises(ValueError):
+            client.get("/api/v1/sessions", headers={"Content-Length": "10"})
 
 
 # ---------------------------------------------------------------------------
@@ -285,8 +316,9 @@ class TestValidateSafePath:
         """Path with .. is rejected."""
         from contexter_server.api.files import validate_safe_path
 
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException) as exc:
             validate_safe_path("../../etc/passwd")
+        assert exc.value.status_code == 400
 
     def test_path_within_base_dir_accepted(self) -> None:
         """Path inside base_dir passes the confinement check."""
@@ -306,7 +338,7 @@ class TestValidateSafePath:
         """Path outside base_dir returns 403."""
         from contexter_server.api.files import validate_safe_path
 
-        with pytest.raises(Exception) as exc:
+        with pytest.raises(HTTPException) as exc:
             validate_safe_path("/etc/passwd", base_dir="/tmp")
         assert exc.value.status_code == 403
 
@@ -314,7 +346,7 @@ class TestValidateSafePath:
         """Path like /tmp2 is not considered inside /tmp."""
         from contexter_server.api.files import validate_safe_path
 
-        with pytest.raises(Exception) as exc:
+        with pytest.raises(HTTPException) as exc:
             validate_safe_path("/tmp2/foo", base_dir="/tmp")
         assert exc.value.status_code == 403
 

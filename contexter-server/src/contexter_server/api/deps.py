@@ -37,9 +37,9 @@ _logger = get_logger(__name__)
 
 
 async def get_api_key(request: Request) -> None:
-    """Validate ``Authorization: Bearer <key>`` against ``CONtexTER_API_KEY``.
+    """Validate ``Authorization: Bearer <key>`` against ``CONTEXTER_API_KEY``.
 
-    When the environment variable ``CONtexTER_API_KEY`` is set, every
+    When the environment variable ``CONTEXTER_API_KEY`` is set, every
     request *must* carry a matching ``Authorization: Bearer <key>`` header.
     Requests without a header or with a wrong value receive a ``401``
     response.
@@ -48,10 +48,10 @@ async def get_api_key(request: Request) -> None:
     log — this preserves backward compatibility for development and
     environments that do not require API key auth.
     """
-    api_key = os.environ.get("CONtexTER_API_KEY", "")
+    api_key = os.environ.get("CONTEXTER_API_KEY", "")
     if not api_key:
         _logger.warning(
-            "CONtexTER_API_KEY not set — API key authentication is DISABLED"
+            "CONTEXTER_API_KEY not set — API key authentication is DISABLED"
         )
         return
     auth_header = request.headers.get("Authorization", "")

@@ -87,6 +87,9 @@ pub trait StorageBackend: Send + Sync {
     /// List agents matching the supplied filter criteria.
     fn list_agents(&self, filter: &AgentFilter) -> EngineResult<Vec<Agent>>;
 
+    /// Count agents matching the supplied filter criteria.
+    fn count_agents(&self, filter: &AgentFilter) -> EngineResult<u64>;
+
     /// Partially update an existing agent.
     fn update_agent(&self, id: Uuid, patch: &AgentPatch) -> EngineResult<Agent>;
 
@@ -105,6 +108,9 @@ pub trait StorageBackend: Send + Sync {
 
     /// List skills matching the supplied filter criteria.
     fn list_skills(&self, filter: &SkillFilter) -> EngineResult<Vec<Skill>>;
+
+    /// Count skills matching the supplied filter criteria.
+    fn count_skills(&self, filter: &SkillFilter) -> EngineResult<u64>;
 
     /// Partially update an existing skill.
     fn update_skill(&self, id: Uuid, patch: &SkillPatch) -> EngineResult<Skill>;

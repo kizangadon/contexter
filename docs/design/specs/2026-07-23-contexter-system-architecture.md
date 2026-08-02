@@ -853,39 +853,52 @@ impl Engine {
 Python-side wrapper:
 
 ```python
-# contexter/core/bridge.py
+# contexter-server/src/contexter_server/core/bridge.py
 from contexter_core import Engine as RustEngine
-from typing import Any
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
-
-_executor = ThreadPoolExecutor(max_workers=4)
+import asyncio, json, os
 
 class StorageEngine:
-    """Async-safe wrapper around the Rust Engine."""
+    """Async wrapper around the Rust Engine.
 
-    def __init__(self, config: dict):
-        self._rust = RustEngine(_to_py_config(config))
+    All engine calls are offloaded to a bounded, explicitly managed
+    ThreadPoolExecutor (default 8 workers) via loop.run_in_executor().
+    """
+
+    def __init__(self, path: str, max_workers: int | None = None):
+        if max_workers is None:
+            env_val = os.environ.get("CONTEXTER_BRIDGE_POOL_SIZE", "")
+            max_workers = int(env_val.strip()) if env_val.strip().isdigit() else 8
+        max_workers = max_workers if max_workers > 0 else 8
+        self._pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._engine = RustEngine.open(path)
 
     async def create_memory(self, data: dict) -> dict:
-        return await asyncio.to_thread(self._rust.create_memory, data)
-
-    async def search_memories(self, query: dict) -> dict:
-        return await asyncio.to_thread(self._rust.search_memories, query)
-
-    async def store(self, cf: str, key: str, value: str) -> None:
-        return await asyncio.to_thread(self._rust.store, cf, key, value)
-
-    async def get(self, cf: str, key: str) -> str | None:
-        return await asyncio.to_thread(self._rust.get, cf, key)
+        payload = json.dumps(_camelize_payload_keys(data))
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(self._pool, self._engine.create_memory, payload)
+        return json.loads(result)
     # ...
 ```
+
+Key properties of the implemented bridge:
+
+- **Bounded concurrency** — the pool size is capped (default `8`) and
+  configurable via `CONTEXTER_BRIDGE_POOL_SIZE`; invalid or non-positive
+  values fall back to the default. All dispatch goes through
+  `loop.run_in_executor(self._pool, fn, ...)`, never the loop's default
+  executor.
+- **Mock refusal** — dispatch validates the target method against the real
+  `Engine` class; if a method resolves to a `unittest.mock` object, the call
+  raises `TypeError` instead of executing mock data. A missing wheel raises
+  `ImportError` at import time — the server refuses to run without the real
+  engine.
 
 ### 7.2 Concurrency Model
 
 - **Rust core** uses `Arc<RwLock<...>>` for shared mutable state (storage, vector index, FTS index). Reads take read locks, writes take write locks — contention is low because RocksDB operations are fast (microseconds).
-- **Python async code** calls bridge functions via `asyncio.to_thread()` since PyO3 calls release the GIL but are synchronous.
-- **Thread pool** (`ThreadPoolExecutor(max_workers=4)`) prevents sequential bottleneck. Four workers are sufficient for I/O-bound RocksDB operations.
+- **Python async code** dispatches bridge calls through `loop.run_in_executor(self._pool, fn, ...)` on a bounded `ThreadPoolExecutor`. PyO3 calls release the GIL but are synchronous, so the offload keeps the event loop responsive.
+- **Bounded pool (accepted decision)** — the pool defaults to 8 workers and is configurable via `CONTEXTER_BRIDGE_POOL_SIZE`. This is preferred over bare `asyncio.to_thread()`, which uses the loop's default executor without application control over thread count: under load, `to_thread` allows unbounded thread growth, while the bounded pool caps concurrent engine calls and keeps RocksDB contention predictable and tunable.
 - **Cache** (`DashMap`) is lock-free for reads — no `RwLock` needed for the hot path.
 - **Telemetry** uses a dedicated `AtomicU64` + periodic flush pattern — no locks on the hot increment path.
 
@@ -899,6 +912,78 @@ Python dict ← json.loads ← str ← PyO3 ← serde_json::to_string ← Rust s
 ```
 
 This avoids complex PyO3 type mapping while keeping the boundary explicit. For high-throughput paths (batch memory writes, telemetry ingestion), the bridge can be optimized with direct PyO3 `PyAny` conversions in Phase 2.
+
+Two boundary rules are implemented today:
+
+- **camelCase translation (inbound)** — the bridge translates top-level
+  snake_case keys to the engine's camelCase serde contract
+  (`_camelize_payload_keys`: `agent_id` → `agentId`, `memory_type` →
+  `memoryType`, ...) before serialisation. Nested values such as `metadata`
+  maps pass through untouched as opaque `serde_json::Value`.
+- **Large payloads** — memory content ≥ 100 KB is passed as raw `PyBytes`
+  instead of JSON strings to avoid double-encoding overhead.
+
+### 7.4 Telemetry Mapping & Key Translation
+
+The engine emits distinct telemetry shapes per call — there is no single
+casing contract at the FFI boundary:
+
+| Engine call | Casing | Keys emitted |
+|-------------|--------|--------------|
+| `cache_telemetry()` | snake_case | `gets`, `hits`, `misses`, `stores`, `invalidations`, `total_ops`, `entries_by_type` |
+| `storage_size()` | camelCase | `total`, `perCf`, `walSize` |
+| `status()` | camelCase (nested) | `status`, `version`, `cacheTelemetry` → `hits`, `misses`, `totalOps`, `hitRatio`, `entriesByType` |
+
+The analytics layer (`AnalyticsService`) is the anti-corruption layer that
+maps these engine shapes onto the analytics domain models — snake_case fields
+such as `total_sessions`, `storage_size_bytes`, `total_operations`,
+`cache_hit_rate`, `cache_entries`. It consumes the engine's camelCase keys
+explicitly (e.g., `total` from `storage_size()`, the nested `cacheTelemetry`
+from `status()`) alongside the snake_case `cache_telemetry()` keys, so the
+domain model is never coupled to a single engine casing.
+
+`_safe_get` in the analytics domain service guards only against non-dict
+results (exceptions, `None`), returning the caller's default. It does **not**
+mask key mismatches: telemetry keys are mapped explicitly and verified by
+tests, so counters reflect real engine data rather than structurally
+defaulting to zero when a key is renamed or mistyped. If a mapping regresses,
+the affected counters surface as wrong values in tests, not as silent zeros
+in production.
+
+### 7.5 Accepted Performance Decisions
+
+The following performance characteristics are accepted by design and are
+covered by the MCP performance contract (PF-05..PF-11):
+
+- **Per-call logging at DEBUG** — per-call events (`bridge_call_end` in the
+  bridge; `call_received`, `auth_decision`, `engine_result` in the MCP
+  handlers) are logged at **DEBUG**. The default INFO level therefore stays
+  quiet at MCP call rates; INFO is reserved for lifecycle and error events,
+  and the failure path logs at ERROR with bounded context — no content
+  payloads or secrets (REQ-PLB-001 / REQ-HO-002).
+- **MCP list bounds** — `list_skills` is frozen without a limit parameter
+  (engine default 100); `list_recent_sessions` clamps explicit limits to
+  `MAX_SESSION_LIST_LIMIT` (10,000) and pushes them to the engine. No
+  pagination exists today; it is deferred to the next MCP contract revision.
+- **Two sequential engine calls per `store_memory`** — `get_session` then
+  `create_memory`, sequential because `agent_id` is derived from the
+  session. Deliberate; not an N+1 pattern (PF-07).
+- **`export_data` bounded materialisation** — up to 10,000 records per
+  entity are gathered into memory (bounded, pre-existing) and the results
+  are LRU-cached (100 entries) with `set_setting` persistence for repeated
+  reads (PF-08).
+- **Unfiltered counts use the `estimate-num-keys` fast path** —
+  `count_sessions`, `count_agents`, `count_skills` (and `count_memories`)
+  without a filter return RocksDB's `rocksdb.estimate-num-keys` property
+  (O(1), no scan). The estimate is exact on a freshly seeded store but
+  counts **memtable update history**: updates/deletes inflate it until
+  background compaction merges the key versions, and `flush()` does not
+  correct it (measured: 100 creates + 100 updates → 200 vs 100 actual;
+  +50 deletes → 150 vs 50; flush leaves 170 vs 60). Exactness remains
+  available via filtered counts (index-prefix scan, e.g.
+  `count_sessions({"project": ...})`) or the `list_*` tools — bounded at
+  100, no pagination (see list bounds above), so filtered counts are the
+  exactness path for larger datasets (PF-09/PF-10 semantics, PF-11).
 
 ---
 

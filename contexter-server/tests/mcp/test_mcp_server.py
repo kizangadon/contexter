@@ -13,6 +13,7 @@ import pytest
 
 from contexter_server.mcp_server import create_mcp_server
 from contexter_server.mcp_tools.auth import MCPAuthError
+from contexter_server.mcp_tools.errors import HandlerError
 from contexter_server.mcp_tools.handlers import (
     handle_agent_resource,
     handle_export_data,
@@ -110,46 +111,45 @@ class TestStoreMemory:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_session_not_found(self, mock_services, any_uuid):
-        """Should return error when session does not exist."""
+        """Should raise a structured not-found error when session does not exist."""
         mock_services["session_service"].get.return_value = None
 
-        result = await handle_store_memory(
-            session_id=any_uuid,
-            role="user",
-            content="Hello",
-            memory_service=mock_services["memory_service"],
-            session_service=mock_services["session_service"],
-        )
+        with pytest.raises(HandlerError) as exc:
+            await handle_store_memory(
+                session_id=any_uuid,
+                role="user",
+                content="Hello",
+                memory_service=mock_services["memory_service"],
+                session_service=mock_services["session_service"],
+            )
 
-        assert "error" in result
-        assert "not found" in result["error"]
+        assert "Resource not found" in str(exc.value)
 
     @pytest.mark.asyncio
     async def test_returns_error_for_invalid_uuid(self, mock_services, any_uuid):
-        """Should return error when session_id is not a valid UUID."""
+        """Should raise a structured error when session_id is not a valid UUID."""
         mock_services["session_service"].get.return_value = None
 
-        result = await handle_store_memory(
-            session_id="not-a-uuid",
-            role="user",
-            content="Hello",
-            memory_service=mock_services["memory_service"],
-            session_service=mock_services["session_service"],
-        )
+        with pytest.raises(HandlerError) as exc:
+            await handle_store_memory(
+                session_id="not-a-uuid",
+                role="user",
+                content="Hello",
+                memory_service=mock_services["memory_service"],
+                session_service=mock_services["session_service"],
+            )
 
-        assert "error" in result
-        assert "uuid" in result["error"].lower() or "invalid" in result["error"].lower()
+        assert "uuid" in str(exc.value).lower() or "invalid" in str(exc.value).lower()
 
     @pytest.mark.asyncio
     async def test_returns_error_when_services_unavailable(self, any_uuid):
-        """Should return error when services are None."""
-        result = await handle_store_memory(
-            session_id=any_uuid,
-            role="user",
-            content="Hello",
-        )
-
-        assert "error" in result
+        """Should raise a structured error when services are None."""
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_store_memory(
+                session_id=any_uuid,
+                role="user",
+                content="Hello",
+            )
 
 
 class TestSearchMemories:
@@ -187,7 +187,7 @@ class TestSearchMemories:
 
         await handle_search_memories(
             query="test",
-            type_filter="user",
+            type="user",
             project="my-project",
             limit=10,
             memory_service=mock_services["memory_service"],
@@ -201,9 +201,9 @@ class TestSearchMemories:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self):
-        """Should return error when memory_service is None."""
-        result = await handle_search_memories(query="test")
-        assert "error" in result
+        """Should raise a structured error when memory_service is None."""
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_search_memories(query="test")
 
 
 class TestGetSession:
@@ -225,21 +225,21 @@ class TestGetSession:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_not_found(self, mock_services):
-        """Should return error for missing session."""
+        """Should raise a structured not-found error for missing session."""
         mock_services["session_service"].get.return_value = None
 
-        result = await handle_get_session(
-            id="nonexistent",
-            session_service=mock_services["session_service"],
-        )
+        with pytest.raises(HandlerError) as exc:
+            await handle_get_session(
+                id="nonexistent",
+                session_service=mock_services["session_service"],
+            )
 
-        assert "error" in result
-        assert "not found" in result["error"]
+        assert "Resource not found: nonexistent" in str(exc.value)
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self, any_uuid):
-        result = await handle_get_session(id=any_uuid)
-        assert "error" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_get_session(id=any_uuid)
 
 
 class TestListRecentSessions:
@@ -260,14 +260,19 @@ class TestListRecentSessions:
 
     @pytest.mark.asyncio
     async def test_respects_limit(self, mock_services, sample_session, any_uuid):
-        """Should limit returned sessions."""
+        """Should forward the limit to the service (the engine applies it)."""
         alt_id = any_uuid.replace("-1", "-2") if "-1" in any_uuid else any_uuid
         session2 = Session(
             id=UUID(alt_id),
             agent_id=UUID(any_uuid),
             project="test-project",
         )
-        mock_services["session_service"].list.return_value = [sample_session, session2]
+        all_sessions = [sample_session, session2]
+
+        async def limit_aware_list(filter=None, limit=None):
+            return all_sessions if limit is None else all_sessions[:limit]
+
+        mock_services["session_service"].list.side_effect = limit_aware_list
 
         result = await handle_list_recent_sessions(
             limit=1,
@@ -275,6 +280,9 @@ class TestListRecentSessions:
         )
 
         assert len(result["sessions"]) == 1
+        mock_services["session_service"].list.assert_awaited_once_with(
+            filter=None, limit=1
+        )
 
     @pytest.mark.asyncio
     async def test_filters_by_project(self, mock_services):
@@ -292,8 +300,8 @@ class TestListRecentSessions:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self):
-        result = await handle_list_recent_sessions()
-        assert "error" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_list_recent_sessions()
 
 
 class TestGetAgentInfo:
@@ -316,18 +324,18 @@ class TestGetAgentInfo:
     async def test_returns_error_when_not_found(self, mock_services):
         mock_services["agent_service"].get.return_value = None
 
-        result = await handle_get_agent_info(
-            id="nonexistent",
-            agent_service=mock_services["agent_service"],
-        )
+        with pytest.raises(HandlerError) as exc:
+            await handle_get_agent_info(
+                id="nonexistent",
+                agent_service=mock_services["agent_service"],
+            )
 
-        assert "error" in result
-        assert "not found" in result["error"]
+        assert "Resource not found: nonexistent" in str(exc.value)
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self, any_uuid):
-        result = await handle_get_agent_info(id=any_uuid)
-        assert "error" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_get_agent_info(id=any_uuid)
 
 
 class TestListSkills:
@@ -358,7 +366,7 @@ class TestListSkills:
         mock_services["skill_service"].list.return_value = []
 
         await handle_list_skills(
-            type_filter="search",
+            type="search",
             skill_service=mock_services["skill_service"],
         )
 
@@ -367,8 +375,8 @@ class TestListSkills:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self):
-        result = await handle_list_skills()
-        assert "error" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_list_skills()
 
 
 class TestGetSystemHealth:
@@ -396,8 +404,8 @@ class TestGetSystemHealth:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self):
-        result = await handle_get_system_health()
-        assert "error" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_get_system_health()
 
 
 class TestExportData:
@@ -423,8 +431,8 @@ class TestExportData:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self):
-        result = await handle_export_data()
-        assert "error" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_export_data()
 
 
 # ── Resource Tests ──────────────────────────────────────────────────────
@@ -450,17 +458,18 @@ class TestSessionResource:
     async def test_returns_not_found_message(self, mock_services):
         mock_services["session_service"].get.return_value = None
 
-        result = await handle_session_resource(
-            id="nonexistent",
-            session_service=mock_services["session_service"],
-        )
+        with pytest.raises(HandlerError) as exc:
+            await handle_session_resource(
+                id="nonexistent",
+                session_service=mock_services["session_service"],
+            )
 
-        assert result == "Session not found"
+        assert "Resource not found: nonexistent" in str(exc.value)
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self, any_uuid):
-        result = await handle_session_resource(id=any_uuid)
-        assert "not connected" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_session_resource(id=any_uuid)
 
 
 class TestMemoryResource:
@@ -482,17 +491,18 @@ class TestMemoryResource:
     async def test_returns_not_found_message(self, mock_services):
         mock_services["memory_service"].get.return_value = None
 
-        result = await handle_memory_resource(
-            id="nonexistent",
-            memory_service=mock_services["memory_service"],
-        )
+        with pytest.raises(HandlerError) as exc:
+            await handle_memory_resource(
+                id="nonexistent",
+                memory_service=mock_services["memory_service"],
+            )
 
-        assert result == "Memory not found"
+        assert "Resource not found: nonexistent" in str(exc.value)
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self, any_uuid):
-        result = await handle_memory_resource(id=any_uuid)
-        assert "not connected" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_memory_resource(id=any_uuid)
 
 
 class TestAgentResource:
@@ -514,17 +524,18 @@ class TestAgentResource:
     async def test_returns_not_found_message(self, mock_services):
         mock_services["agent_service"].get.return_value = None
 
-        result = await handle_agent_resource(
-            id="nonexistent",
-            agent_service=mock_services["agent_service"],
-        )
+        with pytest.raises(HandlerError) as exc:
+            await handle_agent_resource(
+                id="nonexistent",
+                agent_service=mock_services["agent_service"],
+            )
 
-        assert result == "Agent not found"
+        assert "Resource not found: nonexistent" in str(exc.value)
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self, any_uuid):
-        result = await handle_agent_resource(id=any_uuid)
-        assert "not connected" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_agent_resource(id=any_uuid)
 
 
 class TestAnalyticsOverviewResource:
@@ -550,8 +561,8 @@ class TestAnalyticsOverviewResource:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_service_unavailable(self):
-        result = await handle_analytics_overview_resource()
-        assert "not connected" in result
+        with pytest.raises(HandlerError, match="not connected to storage"):
+            await handle_analytics_overview_resource()
 
 
 # ── Server Creation Tests ──────────────────────────────────────────────
@@ -565,8 +576,8 @@ class TestToolAuth:
 
     @pytest.fixture(autouse=True)
     def _patch_env(self):
-        """Set CONtexTER_API_KEY for auth tests (restore after)."""
-        with mock.patch.dict(os.environ, {"CONtexTER_API_KEY": "test-key-123"}):
+        """Set CONTEXTER_API_KEY for auth tests (restore after)."""
+        with mock.patch.dict(os.environ, {"CONTEXTER_API_KEY": "test-key-123"}):
             yield
 
     @pytest.mark.asyncio
@@ -672,13 +683,87 @@ class TestToolAuth:
             )
 
 
+class TestToolAuthOpenMode:
+    """EC-015: ``CONTEXTER_API_KEY`` unset + no ``_api_key`` -> calls succeed.
+
+    Parent EDGE_CASES.md, Error States table row 4: "CONTEXTER_API_KEY unset
+    + no ``_api_key`` passed -> Calls succeed (backward compat / open mode)".
+    Unit-level open-mode coverage lives in ``test_mcp_auth.py``
+    (``TestRequireApiKey.test_no_key_configured_*``) but exercises only
+    ``require_api_key()`` directly; these tests assert the documented behavior
+    at the tool/resource call seam with ``CONTEXTER_API_KEY`` explicitly
+    cleared (EC-PEC-001 mapping: complementary seam, not a duplicate).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clear_env(self):
+        """Clear CONTEXTER_API_KEY (open mode) for these tests (restore after)."""
+        with mock.patch.dict(os.environ, {}, clear=True):
+            yield
+
+    @pytest.mark.asyncio
+    async def test_tool_call_succeeds_without_api_key_in_open_mode(
+        self, mock_services, sample_session, sample_memory, any_uuid
+    ):
+        """store_memory without _api_key succeeds when no key is configured."""
+        mock_services["session_service"].get.return_value = sample_session
+        mock_services["memory_service"].create.return_value = sample_memory
+
+        result = await handle_store_memory(
+            session_id=any_uuid,
+            role="user",
+            content="test",
+            memory_service=mock_services["memory_service"],
+            session_service=mock_services["session_service"],
+        )
+
+        assert "error" not in result
+        assert result["memory_id"] == any_uuid
+        mock_services["memory_service"].create.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_resource_call_succeeds_without_api_key_in_open_mode(
+        self, mock_services, sample_session, any_uuid
+    ):
+        """session_resource without _api_key succeeds when no key is configured."""
+        mock_services["session_service"].get.return_value = sample_session
+
+        result = await handle_session_resource(
+            id=any_uuid,
+            session_service=mock_services["session_service"],
+        )
+
+        assert result.startswith("{")
+        assert "Test Session" in result
+
+    @pytest.mark.asyncio
+    async def test_stray_api_key_tolerated_in_open_mode(
+        self, mock_services, sample_session, sample_memory, any_uuid
+    ):
+        """Passing any _api_key in open mode is tolerated (backward compat)."""
+        mock_services["session_service"].get.return_value = sample_session
+        mock_services["memory_service"].create.return_value = sample_memory
+
+        result = await handle_store_memory(
+            session_id=any_uuid,
+            role="user",
+            content="test",
+            _api_key="stray-key",
+            memory_service=mock_services["memory_service"],
+            session_service=mock_services["session_service"],
+        )
+
+        assert "error" not in result
+        assert result["memory_id"] == any_uuid
+
+
 class TestResourceAuth:
     """Tests for resource handler authentication enforcement."""
 
     @pytest.fixture(autouse=True)
     def _patch_env(self):
-        """Set CONtexTER_API_KEY for auth tests (restore after)."""
-        with mock.patch.dict(os.environ, {"CONtexTER_API_KEY": "test-key-123"}):
+        """Set CONTEXTER_API_KEY for auth tests (restore after)."""
+        with mock.patch.dict(os.environ, {"CONTEXTER_API_KEY": "test-key-123"}):
             yield
 
     @pytest.mark.asyncio
@@ -834,22 +919,40 @@ class TestCreateMCPServer:
 
 
 class TestMCPServerLifecycle:
-    """Tests for MCP server lifecycle in the FastAPI app."""
+    """Tests for MCP server lifecycle in the FastAPI app.
 
-    def test_app_stores_mcp_thread_and_event(self):
+    The production ``_run_mcp_server`` launches a blocking SSE server on a
+    fixed port (8052) that never observes the shutdown event, so the lifespan
+    join would time out and the thread would stay alive.  These tests
+    therefore substitute a cooperative runner that blocks until the shutdown
+    event is set and then returns: the lifespan's real thread/event/join
+    logic is exercised deterministically, without binding the port or leaking
+    a zombie thread into other tests (REQ-LS-003).
+    """
+
+    @staticmethod
+    def _cooperative_mcp_runner(mcp, shutdown_event=None):
+        """Stand-in for ``main._run_mcp_server``: block until shutdown."""
+        if shutdown_event is not None:
+            shutdown_event.wait(timeout=10)
+
+    def test_app_stores_mcp_thread_and_event(self, tmp_path):
         """create_app should store mcp_thread and mcp_shutdown_event on app.state."""
         from contexter_server.main import create_app
-        app = create_app(data_path="/tmp/contexter-test-lifecycle")
+        app = create_app(data_path=str(tmp_path))
 
         # App is created but lifespan hasn't run yet (no thread/event)
         assert not hasattr(app.state, "mcp_thread") or app.state.mcp_thread is None
 
-    def test_lifespan_sets_mcp_state(self):
+    def test_lifespan_sets_mcp_state(self, tmp_path, monkeypatch):
         """Entering the lifespan context should start the MCP thread."""
         from contexter_server.main import create_app
         from fastapi.testclient import TestClient
 
-        app = create_app(data_path="/tmp/contexter-test-lifecycle")
+        monkeypatch.setattr(
+            "contexter_server.main._run_mcp_server", self._cooperative_mcp_runner
+        )
+        app = create_app(data_path=str(tmp_path))
 
         with TestClient(app) as client:
             thread = client.app.state.mcp_thread
@@ -862,17 +965,66 @@ class TestMCPServerLifecycle:
         # After lifespan exit, the shutdown event should be set
         assert event.is_set()
 
-    def test_lifespan_shutdown_joins_thread(self):
+    def test_lifespan_shutdown_joins_thread(self, tmp_path, monkeypatch):
         """Exiting the lifespan should join the MCP thread with a timeout."""
         from contexter_server.main import create_app
         from fastapi.testclient import TestClient
 
-        app = create_app(data_path="/tmp/contexter-test-lifecycle")
+        monkeypatch.setattr(
+            "contexter_server.main._run_mcp_server", self._cooperative_mcp_runner
+        )
+        app = create_app(data_path=str(tmp_path))
 
         with TestClient(app) as client:
             thread = client.app.state.mcp_thread
 
-        # After lifespan exit, thread should have been joined (daemon + join)
-        # Since run() blocks, the daemon thread exits when the interpreter
-        # shuts down; the join() call in the lifespan waits up to 5 s.
+        # After lifespan exit, the shutdown event is set, the cooperative
+        # runner returns, and the join() in the lifespan completes.
+        assert not thread.is_alive()
+
+    def test_lifespan_shutdown_before_startup_completes(self, tmp_path, monkeypatch):
+        """EC-LS-002: shutdown while the runner is still starting up joins
+        cleanly without hanging."""
+        import threading
+
+        from contexter_server.main import create_app
+        from fastapi.testclient import TestClient
+
+        startup_reached = threading.Event()
+
+        def _slow_startup(mcp, shutdown_event=None):
+            startup_reached.set()
+            if shutdown_event is not None:
+                shutdown_event.wait(timeout=10)
+
+        monkeypatch.setattr("contexter_server.main._run_mcp_server", _slow_startup)
+        app = create_app(data_path=str(tmp_path))
+
+        with TestClient(app) as client:
+            assert startup_reached.wait(timeout=5)
+            thread = client.app.state.mcp_thread
+            assert thread.is_alive()
+
+        # Exit set the event while the runner was mid-startup; join completed.
+        assert not thread.is_alive()
+
+    def test_lifespan_double_shutdown_is_idempotent(self, tmp_path, monkeypatch):
+        """EC-LS-003: a second shutdown after the first completes is a
+        no-op — no error, thread stays dead."""
+        from contexter_server.main import create_app
+        from fastapi.testclient import TestClient
+
+        monkeypatch.setattr(
+            "contexter_server.main._run_mcp_server", self._cooperative_mcp_runner
+        )
+        app = create_app(data_path=str(tmp_path))
+
+        with TestClient(app) as client:
+            thread = client.app.state.mcp_thread
+            event = client.app.state.mcp_shutdown_event
+
+        assert not thread.is_alive()
+        # Second shutdown path: set + join again (idempotent, no error).
+        event.set()
+        thread.join(timeout=5.0)
         assert not thread.is_alive()

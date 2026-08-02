@@ -108,7 +108,7 @@ def _register_routers(app: FastAPI) -> None:
     """Register all API route routers on the application.
 
     Every ``/api/v1/`` router gets the ``get_api_key`` dependency so that
-    API-key authentication is enforced unless ``CONtexTER_API_KEY`` is unset.
+    API-key authentication is enforced unless ``CONTEXTER_API_KEY`` is unset.
     """
     router_auth = [Depends(get_api_key)]
     for router in (
@@ -178,10 +178,10 @@ def _add_security_headers_middleware(app: FastAPI) -> None:
 
 
 def _add_body_size_limit_middleware(app: FastAPI) -> None:
-    """Reject requests whose body exceeds ``MAX_REQUEST_BODY``.
+    """Reject requests whose body exceeds ``CONTEXTER_MAX_REQUEST_BODY``.
 
-    The limit is read from the ``MAX_REQUEST_BODY`` environment variable
-    (in bytes) and defaults to 1 048 576 (1 MiB).
+    The limit is read from the ``CONTEXTER_MAX_REQUEST_BODY`` environment
+    variable (in bytes) and defaults to 1 048 576 (1 MiB).
 
     ``Transfer-Encoding: chunked`` is explicitly rejected because
     FastAPI/Starlette streams chunked bodies and the ``Content-Length``
@@ -202,7 +202,9 @@ def _add_body_size_limit_middleware(app: FastAPI) -> None:
                 content={"detail": "Transfer-Encoding chunked not supported"},
             )
 
-        max_bytes = int(os.environ.get("MAX_REQUEST_BODY", str(1 * 1024 * 1024)))
+        max_bytes = int(
+            os.environ.get("CONTEXTER_MAX_REQUEST_BODY", str(1 * 1024 * 1024))
+        )
         content_length_str = request.headers.get("Content-Length")
         if content_length_str is not None:
             try:
@@ -221,7 +223,7 @@ def _add_rate_limiting_middleware(app: FastAPI) -> SlowApiLimiter:
     """Add rate limiting middleware via slowapi.
 
     The limiter is created by ``create_limiter()`` which reads the
-    ``CONtexTER_RATE_LIMIT_ENABLED`` and ``CONtexTER_RATE_LIMIT``
+    ``CONTEXTER_RATE_LIMIT_ENABLED`` and ``CONTEXTER_RATE_LIMIT``
     environment variables.
 
     Returns the ``Limiter`` instance so callers can attach route-level
@@ -237,13 +239,13 @@ def _add_rate_limiting_middleware(app: FastAPI) -> SlowApiLimiter:
 def _resolve_docs_url() -> tuple[str | None, str | None, str | None]:
     """Return (docs_url, redoc_url, openapi_url) based on config.
 
-    When ``CONtexTER_ENABLE_DOCS=true`` the interactive docs and OpenAPI
+    When ``CONTEXTER_ENABLE_DOCS=true`` the interactive docs and OpenAPI
     schema are served; otherwise they are disabled (return ``None``).
     """
-    enable = os.environ.get("CONtexTER_ENABLE_DOCS", "").strip().lower() == "true"
+    enable = os.environ.get("CONTEXTER_ENABLE_DOCS", "").strip().lower() == "true"
     if enable:
         return "/docs", "/redoc", "/openapi.json"
-    logger.info("OpenAPI docs disabled (set CONtexTER_ENABLE_DOCS=true to enable)")
+    logger.info("OpenAPI docs disabled (set CONTEXTER_ENABLE_DOCS=true to enable)")
     return None, None, None
 
 
