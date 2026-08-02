@@ -3,7 +3,7 @@
 Verifies that:
 - Exceeding the configured rate limit returns 429.
 - The ``/health`` endpoint is exempt from rate limiting.
-- Rate limiting can be disabled via ``CONtexTER_RATE_LIMIT_ENABLED=false``.
+- Rate limiting can be disabled via ``CONTEXTER_RATE_LIMIT_ENABLED=false``.
 """
 
 import os
@@ -42,7 +42,7 @@ def _build_app_with_limit(limit: str) -> FastAPI:
     All domain services are backed by a mock ``StorageEngine`` so the
     resulting app is safe to use in unit tests.
     """
-    with mock.patch.dict(os.environ, {"CONtexTER_RATE_LIMIT": limit}):
+    with mock.patch.dict(os.environ, {"CONTEXTER_RATE_LIMIT": limit}):
         app = create_app(data_path="/tmp/contexter-test")
 
     _inject_mock_services(app)
@@ -93,23 +93,28 @@ def _inject_mock_services(app: FastAPI) -> None:
     # Maintenance
     engine.flush.return_value = None
     engine.checkpoint.return_value = 0
-    engine.storage_size.return_value = {"total_bytes": 0}
+    # Analytics shapes (unused by these tests, but kept truthful to the real
+    # Rust engine: snake_case cache_telemetry, camelCase storage_size).
+    engine.storage_size.return_value = {"perCf": {}, "total": 0, "walSize": 0}
     engine.status.return_value = {
         "status": "ok",
-        "uptime_seconds": 0,
-        "memory_usage_mb": 0.0,
-        "latency_ms": 0.0,
-        "cpu_percent": 0.0,
+        "version": "0.1.0",
+        "cacheTelemetry": {
+            "entriesByType": {},
+            "hitRatio": 0.0,
+            "hits": 0,
+            "misses": 0,
+            "totalOps": 0,
+        },
     }
     engine.cache_telemetry.return_value = {
-        "total_sessions": 0,
-        "total_memories": 0,
-        "total_agents": 0,
-        "total_skills": 0,
-        "cache_entries": 0,
-        "avg_response_time_ms": 0.0,
-        "total_operations": 0,
-        "cache_hit_rate": 0.0,
+        "gets": 0,
+        "hits": 0,
+        "misses": 0,
+        "stores": 0,
+        "invalidations": 0,
+        "total_ops": 0,
+        "entries_by_type": {},
     }
 
     services: dict[str, object] = {
@@ -184,12 +189,12 @@ class TestRateLimitingDisabled:
     """BUG-020: Rate limiting can be disabled."""
 
     def test_requests_succeed_when_disabled(self) -> None:
-        """When CONtexTER_RATE_LIMIT_ENABLED=false, no 429 is returned."""
+        """When CONTEXTER_RATE_LIMIT_ENABLED=false, no 429 is returned."""
         with mock.patch.dict(
             os.environ,
             {
-                "CONtexTER_RATE_LIMIT": "1/minute",
-                "CONtexTER_RATE_LIMIT_ENABLED": "false",
+                "CONTEXTER_RATE_LIMIT": "1/minute",
+                "CONTEXTER_RATE_LIMIT_ENABLED": "false",
             },
         ):
             app = create_app(data_path="/tmp/contexter-test")

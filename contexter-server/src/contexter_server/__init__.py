@@ -44,3 +44,11 @@ structlog.configure(
 import logging
 _log = logging.getLogger()
 _log.setLevel(logging.INFO)
+
+# FastMCP framework logging policy: bound failure stderr (REQ-FL-001).
+# Installed at package import so every entry point (run_mcp.py, API app,
+# tests) gets the policy.  Filters survive FastMCP's own logging
+# configuration because it removes handlers only.
+from contexter_server.fastmcp_logging import configure_fastmcp_failure_stderr
+
+configure_fastmcp_failure_stderr()

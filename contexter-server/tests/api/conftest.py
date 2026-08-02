@@ -131,6 +131,7 @@ def mock_engine() -> AsyncMock:
     engine.create_agent.return_value = {}
     engine.get_agent.return_value = None
     engine.list_agents.return_value = []
+    engine.count_agents.return_value = 0
     engine.update_agent.return_value = {}
     engine.delete_agent.return_value = None
 
@@ -138,6 +139,7 @@ def mock_engine() -> AsyncMock:
     engine.create_skill.return_value = {}
     engine.get_skill.return_value = None
     engine.list_skills.return_value = []
+    engine.count_skills.return_value = 0
     engine.update_skill.return_value = {}
     engine.delete_skill.return_value = None
 
@@ -152,23 +154,32 @@ def mock_engine() -> AsyncMock:
     # Maintenance
     engine.flush.return_value = None
     engine.checkpoint.return_value = 0
-    engine.storage_size.return_value = {"total_bytes": 0}
+    # Analytics — shapes mirror the real Rust engine (snake_case
+    # cache_telemetry, camelCase storage_size, nested status).
+    engine.count_sessions.return_value = 0
+    engine.count_memories.return_value = 0
+    engine.list_agents.return_value = []
+    engine.list_skills.return_value = []
+    engine.storage_size.return_value = {"perCf": {}, "total": 0, "walSize": 0}
     engine.status.return_value = {
         "status": "ok",
-        "uptime_seconds": 0,
-        "memory_usage_mb": 0.0,
-        "latency_ms": 0.0,
-        "cpu_percent": 0.0,
+        "version": "0.1.0",
+        "cacheTelemetry": {
+            "entriesByType": {},
+            "hitRatio": 0.0,
+            "hits": 0,
+            "misses": 0,
+            "totalOps": 0,
+        },
     }
     engine.cache_telemetry.return_value = {
-        "total_sessions": 0,
-        "total_memories": 0,
-        "total_agents": 0,
-        "total_skills": 0,
-        "cache_entries": 0,
-        "avg_response_time_ms": 0.0,
-        "total_operations": 0,
-        "cache_hit_rate": 0.0,
+        "gets": 0,
+        "hits": 0,
+        "misses": 0,
+        "stores": 0,
+        "invalidations": 0,
+        "total_ops": 0,
+        "entries_by_type": {},
     }
 
     return engine

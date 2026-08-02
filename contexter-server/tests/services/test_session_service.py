@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from contexter_server.models.session import Session, SessionCreate, SessionFilter, SessionPatch
-from contexter_server.services.session_service import SessionService
+from contexter_server.services.session_service import MAX_SESSION_LIST_LIMIT, SessionService
 
 
 @pytest.fixture
@@ -94,6 +94,67 @@ class TestSessionServiceList:
         mock_engine.list_sessions.return_value = []
         result = await service.list()
         assert result == []
+
+
+class TestSessionServiceListLimitPushdown:
+    """Limit pushdown + clamping (bug 2026-08-01-session-limit-pushdown)."""
+
+    @pytest.mark.asyncio
+    async def test_list_pushes_limit_to_engine(self, service, mock_engine, any_uuid):
+        """REQ-SL-004: list(limit=5) must forward the limit to the engine."""
+        mock_engine.list_sessions.return_value = [
+            {"id": any_uuid, "agent_id": any_uuid, "project": "p1", "status": "active"},
+        ]
+        result = await service.list(limit=5)
+        assert len(result) == 1
+        mock_engine.list_sessions.assert_awaited_once_with(None, limit=5)
+
+    @pytest.mark.asyncio
+    async def test_list_pushes_limit_with_filter(self, service, mock_engine, any_uuid):
+        """The limit must be forwarded together with the session filter."""
+        mock_engine.list_sessions.return_value = [
+            {"id": any_uuid, "agent_id": any_uuid, "project": "test", "status": "active"},
+        ]
+        filter_data = SessionFilter(project="test")
+        result = await service.list(filter_data, limit=2)
+        assert len(result) == 1
+        mock_engine.list_sessions.assert_awaited_once_with({"project": "test"}, limit=2)
+
+    @pytest.mark.asyncio
+    async def test_list_clamps_negative_limit_to_zero(self, service, mock_engine):
+        """EC-SL-004: a negative limit is clamped to 0, never raised."""
+        mock_engine.list_sessions.return_value = []
+        result = await service.list(limit=-1)
+        assert result == []
+        mock_engine.list_sessions.assert_awaited_once_with(None, limit=0)
+
+    @pytest.mark.asyncio
+    async def test_list_accepts_zero_limit(self, service, mock_engine):
+        """EC-SL-003: limit=0 is valid and returns no sessions."""
+        mock_engine.list_sessions.return_value = []
+        result = await service.list(limit=0)
+        assert result == []
+        mock_engine.list_sessions.assert_awaited_once_with(None, limit=0)
+
+    @pytest.mark.asyncio
+    async def test_list_clamps_huge_limit_to_max(self, service, mock_engine, any_uuid):
+        """EC-SL-005/AC-SL-002: limits above the documented max clamp to it."""
+        mock_engine.list_sessions.return_value = [
+            {"id": any_uuid, "agent_id": any_uuid, "project": "p1", "status": "active"},
+        ]
+        result = await service.list(limit=1_000_000)
+        assert len(result) == 1
+        mock_engine.list_sessions.assert_awaited_once_with(None, limit=MAX_SESSION_LIST_LIMIT)
+
+    @pytest.mark.asyncio
+    async def test_list_without_limit_keeps_engine_default(self, service, mock_engine, any_uuid):
+        """REQ-SL-001 regression: no limit means the engine default page size."""
+        mock_engine.list_sessions.return_value = [
+            {"id": any_uuid, "agent_id": any_uuid, "project": "p1", "status": "active"},
+        ]
+        result = await service.list()
+        assert len(result) == 1
+        mock_engine.list_sessions.assert_awaited_once_with(None)
 
 
 class TestSessionServiceUpdate:

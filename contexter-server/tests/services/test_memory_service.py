@@ -1,5 +1,7 @@
 """Tests for MemoryService."""
 
+import logging
+import re
 from unittest.mock import AsyncMock
 
 import pytest
@@ -7,6 +9,12 @@ import pytest
 from contexter_server.models.memory import Memory, MemoryCreate, MemoryPatch
 from contexter_server.models.search import SearchQuery, SearchResult, SearchResponse
 from contexter_server.services.memory_service import MemoryService
+
+_MEMORY_LOGGER = "contexter_server.services.memory_service"
+
+# structlog's ConsoleRenderer interleaves ANSI color codes into the rendered
+# message; strip them before asserting on log content.
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 @pytest.fixture
@@ -157,8 +165,14 @@ class TestMemoryServiceSearch:
         assert result.total == 1
 
     @pytest.mark.asyncio
-    async def test_handles_count_failure(self, service, mock_engine, any_uuid):
-        """If count_memories fails but search succeeds, results still returned."""
+    async def test_count_failure_surfaces_negative_total(
+        self, service, mock_engine, any_uuid
+    ):
+        """REQ-STF-001: a count failure must never silently report total=0.
+
+        Results are still returned, but the total surfaces a distinguishing
+        signal (-1) so callers can tell the count is unknown.
+        """
         mock_engine.search_memories.return_value = [
             {"id": any_uuid, "role": "user", "content": "partial", "score": 0.8},
         ]
@@ -166,14 +180,61 @@ class TestMemoryServiceSearch:
         query = SearchQuery(query="partial")
         result = await service.search(query)
         assert len(result.results) == 1
-        assert result.total == 0  # count failed, so total defaults to 0
+        assert result.total == -1  # distinguishing signal, never a silent 0
 
     @pytest.mark.asyncio
-    async def test_handles_search_failure(self, service, mock_engine):
-        """If search_memories fails, empty results returned."""
+    async def test_count_failure_logs_explicit_error(
+        self, service, mock_engine, any_uuid, caplog
+    ):
+        """REQ-STF-001: a count failure is logged explicitly, never masked."""
+        mock_engine.search_memories.return_value = [
+            {"id": any_uuid, "role": "user", "content": "partial", "score": 0.8},
+        ]
+        mock_engine.count_memories.side_effect = Exception("count failed")
+        query = SearchQuery(query="partial")
+
+        with caplog.at_level(logging.ERROR, logger=_MEMORY_LOGGER):
+            result = await service.search(query)
+
+        assert result.total == -1
+        # structlog's stdlib LoggerFactory renders the full line (event +
+        # key-value pairs) before the stdlib call, so assert on the message.
+        messages = [
+            _ANSI_ESCAPE.sub("", r.getMessage())
+            for r in caplog.records
+            if r.name == _MEMORY_LOGGER
+        ]
+        assert any("search_count_failed" in m for m in messages)
+
+    @pytest.mark.asyncio
+    async def test_search_failure_propagates_error(self, service, mock_engine):
+        """EC-STF-001: a failed results call is an error, not silent empty results."""
         mock_engine.search_memories.side_effect = Exception("search failed")
         mock_engine.count_memories.return_value = 0
         query = SearchQuery(query="fail")
+        with pytest.raises(Exception, match="search failed"):
+            await service.search(query)
+
+    @pytest.mark.asyncio
+    async def test_both_calls_fail_propagates_error(self, service, mock_engine):
+        """EC-STF-002: results and count both failing follows the error path."""
+        mock_engine.search_memories.side_effect = Exception("search failed")
+        mock_engine.count_memories.side_effect = Exception("count failed")
+        query = SearchQuery(query="fail")
+        with pytest.raises(Exception, match="search failed"):
+            await service.search(query)
+
+    @pytest.mark.asyncio
+    async def test_total_reflects_full_count_when_truncated(
+        self, service, mock_engine, any_uuid
+    ):
+        """EC-STF-004: total is the real count even when the page is truncated."""
+        mock_engine.search_memories.return_value = [
+            {"id": any_uuid, "role": "user", "content": "one", "score": 0.9},
+        ]
+        mock_engine.count_memories.return_value = 42
+        query = SearchQuery(query="truncated", limit=1)
         result = await service.search(query)
-        assert len(result.results) == 0
-        assert result.total == 0
+        assert len(result.results) == 1
+        assert result.total == 42
+        assert result.total >= len(result.results)

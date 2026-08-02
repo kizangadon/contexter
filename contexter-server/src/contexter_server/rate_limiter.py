@@ -16,9 +16,9 @@ def create_limiter() -> tuple[Limiter, tuple]:
 
     Environment variables
     --------------------
-    ``CONtexTER_RATE_LIMIT_ENABLED``
+    ``CONTEXTER_RATE_LIMIT_ENABLED``
         Set to ``"false"`` to disable all rate limiting (default ``"true"``).
-    ``CONtexTER_RATE_LIMIT``
+    ``CONTEXTER_RATE_LIMIT``
         The default rate-limit string applied to every endpoint
         (default ``"100/minute"``).
 
@@ -29,10 +29,10 @@ def create_limiter() -> tuple[Limiter, tuple]:
         ``app.state.limiter`` and the exception-handler pair to register via
         ``app.add_exception_handler``.
     """
-    enabled = os.environ.get("CONtexTER_RATE_LIMIT_ENABLED", "true")
+    enabled = os.environ.get("CONTEXTER_RATE_LIMIT_ENABLED", "true")
     enabled = enabled.strip().lower() != "false"
 
-    limit_str = os.environ.get("CONtexTER_RATE_LIMIT", "100/minute")
+    limit_str = os.environ.get("CONTEXTER_RATE_LIMIT", "100/minute")
 
     limiter = Limiter(
         key_func=get_remote_address,

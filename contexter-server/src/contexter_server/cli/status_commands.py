@@ -11,12 +11,6 @@ from contexter_server.services.analytics_service import AnalyticsService
 logger = get_logger(__name__)
 
 
-def _get_analytics_service(engine_path: str) -> AnalyticsService:
-    """Build an AnalyticsService from an engine path."""
-    engine = StorageEngine(engine_path)
-    return AnalyticsService(engine)
-
-
 # ---------------------------------------------------------------------------
 # contexter status
 # ---------------------------------------------------------------------------
@@ -26,11 +20,12 @@ def _get_analytics_service(engine_path: str) -> AnalyticsService:
 @click.pass_context
 def status(ctx: click.Context) -> None:
     """Show system status, health, and analytics overview."""
-    service = _get_analytics_service(ctx.obj["engine_path"])
+    engine = StorageEngine(ctx.obj["engine_path"])
+    service = AnalyticsService(engine)
 
     try:
-        overview, health, performance, resources = asyncio.run(
-            _fetch_status(service)
+        overview, health, performance, resources, version = asyncio.run(
+            _fetch_status(service, engine)
         )
     except Exception as e:
         logger.exception("status.fetch_failed")
@@ -39,6 +34,7 @@ def status(ctx: click.Context) -> None:
     click.echo("Contexter System Status")
     click.echo("═" * 60)
     click.echo(f"  Health:               {health.status}")
+    click.echo(f"  Version:              {version}")
     click.echo(f"  Uptime:               {_format_uptime(health.uptime_seconds)}")
     click.echo(f"  Memory usage:         {health.memory_usage_mb:.1f} MB")
     click.echo(f"  Storage size:         {_format_bytes(health.storage_size_bytes)}")
@@ -57,13 +53,36 @@ def status(ctx: click.Context) -> None:
     click.echo(f"  Storage (MB):         {resources.storage_mb:.1f} MB")
 
 
-async def _fetch_status(service: AnalyticsService) -> tuple:
+async def _fetch_status(service: AnalyticsService, engine: StorageEngine) -> tuple:
     """Fetch all status information concurrently."""
     overview = await service.get_overview()
     health = await service.get_health()
     performance = await service.get_performance()
     resources = await service.get_resources()
-    return overview, health, performance, resources
+    version = await _read_engine_version(engine)
+    return overview, health, performance, resources, version
+
+
+async def _read_engine_version(engine: StorageEngine) -> str:
+    """Read the engine version from ``status()`` for display.
+
+    The analytics domain models do not carry the engine version, so the
+    CLI reads it from the bridge directly. A missing or non-string
+    ``version`` degrades to ``"unknown"`` rather than crashing the report;
+    an engine failure propagates to the command's error path unchanged.
+    """
+    raw = await engine.status()
+    if not isinstance(raw, dict):
+        logger.warning(
+            "status.version_payload_invalid",
+            payload_type=type(raw).__name__,
+        )
+        return "unknown"
+    version = raw.get("version")
+    if not isinstance(version, str) or not version:
+        logger.warning("status.version_missing")
+        return "unknown"
+    return version
 
 
 def _format_uptime(seconds: int) -> str:
