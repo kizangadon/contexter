@@ -28,3 +28,6 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Temporary validation scratch files (matches at any depth, e.g. contexter-server/docs/tests/)
+**/docs/tests/
