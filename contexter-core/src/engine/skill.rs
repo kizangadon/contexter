@@ -118,6 +118,16 @@ impl Engine {
         Ok(results.into_iter().skip(offset).take(limit).collect())
     }
 
+    /// Count skills matching the given filter criteria.
+    ///
+    /// **Policy:** Bypass — always reads from L2.
+    pub fn count_skills(&self, filter: &SkillFilter) -> EngineResult<u64> {
+        self.storage
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .count_skills(filter)
+    }
+
     /// Partially update an existing skill.
     ///
     /// **Policy:** Write-around.

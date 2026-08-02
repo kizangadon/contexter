@@ -320,6 +320,15 @@ impl PyEngine {
         })
     }
 
+    fn count_agents(&self, filter_json: &str) -> PyResult<usize> {
+        catch_panic(|| {
+            let filter: AgentFilter = from_str(filter_json)
+                .map_err(|e| PyErr::new::<PyValueError, _>(format!("invalid filter JSON: {e}")))?;
+            let count = self.inner.count_agents(&filter).map_err(map_err)?;
+            Ok(count as usize)
+        })
+    }
+
     fn update_agent(&self, id: &str, patch_json: &str) -> PyResult<Option<String>> {
         catch_panic(|| {
             let uuid = parse_uuid(id, "agent")?;
@@ -382,6 +391,15 @@ impl PyEngine {
             serde_json::to_string(&skills).map_err(|e: serde_json::Error| {
                 PyErr::new::<PyRuntimeError, _>(e.to_string())
             })
+        })
+    }
+
+    fn count_skills(&self, filter_json: &str) -> PyResult<usize> {
+        catch_panic(|| {
+            let filter: SkillFilter = from_str(filter_json)
+                .map_err(|e| PyErr::new::<PyValueError, _>(format!("invalid filter JSON: {e}")))?;
+            let count = self.inner.count_skills(&filter).map_err(map_err)?;
+            Ok(count as usize)
         })
     }
 
